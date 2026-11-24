@@ -397,8 +397,8 @@ test('WIMWIans send catch-up requests visible only to the recipient',async()=>{
  assert.doesNotMatch(adminHome,/Test Classmate/);
  const adminOwn=meetSection(await body(await call('/people/1',admin)));
  assert.match(adminOwn,/WIMWIan is looking to catch up with you/);
- assert.match(adminOwn,/Test Classmate/);
- assert.match(adminOwn,/Accept request/);
+ assert.doesNotMatch(adminOwn,/Test Classmate/);
+ assert.match(adminOwn,/Complete your profile to see who and respond/);
  assert.match(await body(await call('/people/1',classmate)),/Request sent/);
  assert.match(meetSection(await body(await call('/people/2',classmate))),/href="\/people\/1"[\s\S]*Test Admin/);
  assert.match(banner(await body(await call('/',classmate))),/You’ve picked 1/);
@@ -569,7 +569,11 @@ test('catch-up notifications survive until first login, accept once and enforce 
  const login=await call('/verify',null,{token:raw});assert.equal(login.status,303);
  const recipient=login.headers.get('set-cookie').split(';')[0];
  let inbox=await body(await call('/notifications',recipient));
- assert.match(inbox,/Test Admin/);assert.match(inbox,/wants to catch up with you/);assert.match(inbox,/Accept request/);assert.match(inbox,/1 unread/);
+ assert.doesNotMatch(inbox,/Test Admin|Accept request/);assert.match(inbox,/1 classmate wants to catch up with you/);assert.match(inbox,/1 unread/);
+ assert.equal((await call('/meet',recipient,{action:'accept',target:'1',request:wish.request_id})).status,303);
+ assert.equal(sqlite.prepare('SELECT accepted_at FROM meet_wishes WHERE request_id=?').get(wish.request_id).accepted_at,null);
+ for(const [field,value]of Object.entries({city:'Mumbai',life:'Life',family:'Family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(3,field,value);
+ inbox=await body(await call('/notifications',recipient));assert.match(inbox,/Test Admin/);assert.match(inbox,/Accept request/);
  assert.equal((await call('/meet',recipient,{action:'accept',target:'1',request:'wrong'})).status,404);
  assert.equal((await call('/meet',recipient,{action:'accept',target:'1',request:wish.request_id,next:'/notifications'})).status,303);
  assert.ok(sqlite.prepare('SELECT accepted_at FROM meet_wishes WHERE request_id=?').get(wish.request_id).accepted_at);
@@ -659,4 +663,22 @@ test('Home and Memories blur the real feed until the shared profile requirements
  }
  sqlite.prepare("UPDATE profile_fields SET value='' WHERE member=2 AND field='family'").run();
  assert.match(await body(await call('/memories',ck)),/Complete your profile to access memories/);
+});
+
+
+test('required profile checklist links identify and highlight exactly the missing editors and photos',async()=>{
+ const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
+ const html=await body(await call('/people/2',ck));
+ assert.match(html,/Complete these 7 items to unlock everything/);
+ assert.match(html,/Only the five details and two photos below are required/);
+ for(const key of ['city','family','then','now']){
+  assert.ok(html.includes('href="#profile-field-'+key+'"'),key+' checklist link');
+  assert.ok(html.includes('id="profile-field-'+key+'"'),key+' target');
+ }
+ assert.match(html,/data-required-jump="city"/);
+ const full=await body(await call('/profile',ck));assert.match(full,/5 required profile details/);assert.match(full,/2 required photos/);assert.match(full,/Optional career details/);
+ assert.match(html,/Required to unlock/);
+ assert.match(html,/Optional details — not needed to unlock/);
+ assert.match(html,/Add Then photo/);assert.match(html,/Add Now photo/);
+ const other=await body(await call('/people/1',ck));assert.doesNotMatch(other,/Required to unlock|data-required-jump/);
 });
