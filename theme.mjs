@@ -898,4 +898,9 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
   .is-owner .profile-layout .profile-todo:not(.has-required){order:5}
 }
 @media(max-width:650px){.site-footer{margin-top:1.5rem!important;padding:1.25rem 16px!important}.site-footer .footer-controls{gap:0}.site-footer .footer-theme{padding-top:.75rem}.profile-progress-heading{align-items:baseline}}
+
+.profile-lede-label{font:600 .9rem/1.4 var(--sans)!important;letter-spacing:.03em;margin:1rem 0 .2rem;color:var(--brick)}
+.profile-lede-field .profile-lede{margin-top:0!important}
+[data-logout-status]{font-size:.9rem;color:var(--ink);max-width:18rem;white-space:normal}
+[data-logout-status]:empty{display:none}
 `;
