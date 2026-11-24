@@ -633,3 +633,30 @@ test('one shared mobile navigation sits outside the header on site and WhatsApp 
   assert.ok(html.indexOf('<nav class="app-bottom-nav"')>html.indexOf('</main>'));
  }
 });
+
+
+test('Home and Memories blur the real feed until the shared profile requirements are complete',async()=>{
+ const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
+ const posted=await call('/compose',ck,{id:crypto.randomUUID(),body:'Real memory underneath the visual completion prompt'});
+ const postUrl=posted.headers.get('location');
+ for(const path of ['/','/memories']){
+  const html=await body(await call(path,ck));
+  assert.match(html,/Complete your profile to access memories/);
+  assert.match(html,/class="memories-gate-content" inert aria-hidden="true"/);
+  assert.match(html,/Real memory underneath/);
+  assert.match(html,/of 7 complete/);
+  assert.match(html,/Still needed/);
+  assert.match(html,/href="\/people\/2\?complete=whatsapp#whatsapp-unlock"/);
+ }
+ // This is intentionally a visual completion incentive, with the actual content still available.
+ assert.match(await body(await call(postUrl,ck)),/Real memory underneath/);
+ assert.match((await(await call('/memories?fragment=1',ck)).json()).html,/Real memory underneath/);
+ for(const [field,value]of Object.entries({city:'Mumbai',life:'Life',family:'Family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,field,value);
+ for(const path of ['/','/memories']){
+  const html=await body(await call(path,ck));
+  assert.doesNotMatch(html,/<section class="memories-gate"/);
+  assert.match(html,/Real memory underneath/);
+ }
+ sqlite.prepare("UPDATE profile_fields SET value='' WHERE member=2 AND field='family'").run();
+ assert.match(await body(await call('/memories',ck)),/Complete your profile to access memories/);
+});
