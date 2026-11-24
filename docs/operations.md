@@ -72,3 +72,8 @@ On an owner profile, the checklist links target stable `profile-field-*` anchors
 ## Profile and footer cleanup
 
 Owner profiles use one compact completion summary with missing-item links and a single Continue profile action. The full seven-item checklist is collapsed under All 7 requirements. The masked catch-up section links back to this summary rather than repeating its own completion button. On mobile, missing required details appear before Then/Now photos; catch-up and optional details follow. Home no longer repeats a separate WhatsApp completion banner above the memories incentive. Own profiles omit the self-report control. The footer now contains branding and the theme switch only, since the main header and persistent mobile bar already provide navigation.
+
+
+## Sign-out behavior
+
+The server removes the session and expires the cookie. It returns a small confirmation to JavaScript clients or redirects for native form submissions; it does not request a browser-wide cache clear. The client waits up to eight seconds for confirmation, then replaces the page with the signed-out sign-in screen. A failed or timed-out request restores the Log out button and shows a retry message. Profile life text is visibly headed Life, Lately, matching the checklist and editor labels.
