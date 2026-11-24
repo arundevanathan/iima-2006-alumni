@@ -381,7 +381,7 @@ test('logout invalidates the session and confirms sign-out even after a retry',a
  assert.match(await body(await call('/signin?signed-out=1')),/You’re signed out/);
 });
 
-test('WIMWIans pick who they want to catch up with; targets see only a count',async()=>{
+test('WIMWIans send catch-up requests visible only to the recipient',async()=>{
  const {call,session,sqlite}=fixture();
  const admin=await session(1,'aaaa'), classmate=await session(2,'bbbb');
  const banner=html=>html.match(/<section class="meet-banner"[\s\S]*?<\/section>/)?.[0]||'';
@@ -397,8 +397,9 @@ test('WIMWIans pick who they want to catch up with; targets see only a count',as
  assert.doesNotMatch(adminHome,/Test Classmate/);
  const adminOwn=meetSection(await body(await call('/people/1',admin)));
  assert.match(adminOwn,/WIMWIan is looking to catch up with you/);
- assert.doesNotMatch(adminOwn,/Test Classmate/);
- assert.match(await body(await call('/people/1',classmate)),/On your catch-up list/);
+ assert.match(adminOwn,/Test Classmate/);
+ assert.match(adminOwn,/Accept request/);
+ assert.match(await body(await call('/people/1',classmate)),/Request sent/);
  assert.match(meetSection(await body(await call('/people/2',classmate))),/href="\/people\/1"[\s\S]*Test Admin/);
  assert.match(banner(await body(await call('/',classmate))),/You’ve picked 1/);
  assert.equal((await call('/meet',classmate,{action:'add',target:'2'})).status,400);
@@ -545,4 +546,68 @@ test('owner editing is visible and the full editor uses resolved profile values'
  editor=await body(await call('/profile',ck));assert.match(editor,/Owner answer/);assert.doesNotMatch(editor,/An imported bio/);
  await call('/profile',ck,{field:'life',value:''});
  editor=await body(await call('/profile',ck));assert.doesNotMatch(editor,/An imported bio|Owner answer/);
+});
+
+
+test('catch-up notifications survive until first login, accept once and enforce recipient ownership',async()=>{
+ const {call,session,sqlite,env}=fixture();env.ACCESS_MODE='batch';
+ const sender=await session(1,'aaaa'),stranger=await session(2,'bbbb');
+ sqlite.prepare("INSERT INTO roster VALUES(3,'Never Signed In','D3','New')").run();
+ assert.equal(sqlite.prepare('SELECT count(*) n FROM members WHERE id=3').get().n,0);
+ await call('/meet',sender,{action:'add',target:'3'});
+ const wish=sqlite.prepare('SELECT * FROM meet_wishes WHERE member=1 AND target=3').get();
+ assert.ok(wish.request_id);assert.equal(wish.accepted_at,null);
+ let queued=sqlite.prepare("SELECT * FROM notifications WHERE recipient=3 AND kind='catchup_request'").get();
+ assert.ok(queued);assert.equal(queued.actor,1);assert.equal(queued.is_read,0);
+ // Duplicate picks do not generate repeated alerts.
+ await call('/meet',sender,{action:'add',target:'3'});
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM notifications WHERE kind='catchup_request'").get().n,1);
+ assert.equal((await call('/meet',stranger,{action:'accept',target:'1',request:wish.request_id})).status,404);
+ assert.equal((await call('/notifications?open='+queued.id,stranger)).status,404);
+ const raw='first-login-token';const digest=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))).toString('hex');
+ sqlite.prepare('INSERT INTO login_links VALUES(?,?,?,?)').run(digest,3,Date.now()+3600000,'/notifications');
+ const login=await call('/verify',null,{token:raw});assert.equal(login.status,303);
+ const recipient=login.headers.get('set-cookie').split(';')[0];
+ let inbox=await body(await call('/notifications',recipient));
+ assert.match(inbox,/Test Admin/);assert.match(inbox,/wants to catch up with you/);assert.match(inbox,/Accept request/);assert.match(inbox,/1 unread/);
+ assert.equal((await call('/meet',recipient,{action:'accept',target:'1',request:'wrong'})).status,404);
+ assert.equal((await call('/meet',recipient,{action:'accept',target:'1',request:wish.request_id,next:'/notifications'})).status,303);
+ assert.ok(sqlite.prepare('SELECT accepted_at FROM meet_wishes WHERE request_id=?').get(wish.request_id).accepted_at);
+ assert.equal(sqlite.prepare('SELECT is_read FROM notifications WHERE id=?').get(queued.id).is_read,1);
+ let accepted=sqlite.prepare("SELECT * FROM notifications WHERE recipient=1 AND kind='catchup_accepted'").get();assert.ok(accepted);assert.equal(accepted.actor,3);
+ await call('/meet',recipient,{action:'accept',target:'1',request:wish.request_id});
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM notifications WHERE kind='catchup_accepted'").get().n,1);
+ assert.match(await body(await call('/notifications',sender)),/accepted your catch-up request/);
+ assert.match(await body(await call('/people/3',sender)),/Catch-up accepted/);
+ assert.match(await body(await call('/notifications',recipient)),/You accepted this request/);
+ await call('/notifications',sender,{action:'read-all'});
+ assert.equal(sqlite.prepare('SELECT is_read FROM notifications WHERE id=?').get(accepted.id).is_read,1);
+ // Withdrawal preserves notification history; a stale acceptance cannot accept a replacement request.
+ await call('/meet',sender,{action:'remove',target:'3'});
+ assert.match(await body(await call('/notifications',recipient)),/no longer active/);
+ await call('/meet',sender,{action:'add',target:'3'});
+ const replacement=sqlite.prepare('SELECT request_id FROM meet_wishes WHERE member=1 AND target=3').get().request_id;
+ assert.notEqual(replacement,wish.request_id);
+ assert.equal((await call('/meet',recipient,{action:'accept',target:'1',request:wish.request_id})).status,404);
+ assert.equal(sqlite.prepare('SELECT count(*) n FROM notifications').get().n,3);
+});
+
+test('notification migrations preserve existing history and backfill genuine offline activity once',()=>{
+ const sqlite=new DatabaseSync(':memory:');
+ for(const filename of readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')&&name<'0015').sort()){
+  if(filename==='0002_publish_imports.sql')continue;
+  sqlite.exec(readFileSync(new URL('../migrations/'+filename,import.meta.url),'utf8'));
+ }
+ sqlite.exec("INSERT INTO roster VALUES(1,'One','1','A'),(2,'Two','2','B'); INSERT INTO meet_wishes(member,target,created) VALUES(1,2,1700000000000); INSERT INTO notifications(id,recipient,actor,kind,event_key,is_read) VALUES(44,1,2,'like','preserve-me',1);");
+ sqlite.exec(readFileSync(new URL('../migrations/0015_catchup_notifications.sql',import.meta.url),'utf8'));
+ assert.equal(sqlite.prepare('SELECT is_read FROM notifications WHERE id=44').get().is_read,1);
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM notifications WHERE recipient=2 AND kind='catchup_request'").get().n,1);
+ assert.equal(sqlite.prepare('SELECT count(*) n FROM members').get().n,0);
+ // Simulate legacy memory data created before live triggers ran.
+ sqlite.exec("DROP TRIGGER notify_like; DROP TRIGGER notify_comment; DROP TRIGGER notify_about; INSERT INTO posts(id,author,body,created) VALUES('old',1,'Old memory',1700000000000); INSERT INTO likes VALUES('old',2); INSERT INTO comments VALUES('old-comment','old',2,'Old comment',1700000001000,0); INSERT INTO memory_about VALUES('old','person','2');");
+ const history=readFileSync(new URL('../migrations/0016_notification_history.sql',import.meta.url),'utf8');
+ sqlite.exec(history);const before=sqlite.prepare('SELECT count(*) n FROM notifications').get().n;
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM notifications WHERE recipient=2 AND kind='mention'").get().n,1);
+ sqlite.exec(history);assert.equal(sqlite.prepare('SELECT count(*) n FROM notifications').get().n,before);
+ assert.deepEqual(sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
 });
