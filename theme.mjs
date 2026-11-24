@@ -858,4 +858,23 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
 .catchup-mask-person i{width:32px;height:32px;display:block;border-radius:50%;background:var(--brick)}
 .notification-locked-label{padding:.5rem .85rem 0;color:var(--muted);font-size:.9rem}
 .notification-card>.catchup-locked{margin:.65rem}
+
+/* Footer links and the theme switch have separate, predictable layouts. */
+.footer-controls{display:grid;justify-items:end;gap:.8rem;min-width:0}
+.footer-tagline::before{content:' · '}
+.site-footer .footer-theme{margin:0}
+.site-footer .footer-theme button{min-height:40px;padding:.4rem .8rem}
+@media(max-width:650px){
+  .site-footer{padding:1.5rem 16px!important}
+  .site-footer>div{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:1.15rem}
+  .site-footer .footer-brand,.site-footer .footer-controls{width:100%;min-width:0;text-align:left}
+  .site-footer .reunion-title{font-size:clamp(1.65rem,7vw,2rem);line-height:1.12}
+  .site-footer .footer-brand>p:not(.reunion-title){font-size:.75rem;line-height:1.6;letter-spacing:.045em;margin-top:.6rem}
+  .footer-tagline{display:block}.footer-tagline::before{content:none}
+  .site-footer .footer-controls{display:grid;justify-items:start;gap:.75rem}
+  .site-footer nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;align-items:center;gap:.15rem .6rem}
+  .site-footer nav a{display:flex;align-items:center;min-height:40px;margin:0;padding:.25rem 0;font-size:.875rem;line-height:1.3;text-decoration:none}
+  .site-footer .footer-theme{padding-top:.6rem;border-top:1px solid #ffffff20;width:100%}
+  .site-footer .footer-theme button{margin:0}
+}
 `;
