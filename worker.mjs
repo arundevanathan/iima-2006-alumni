@@ -425,7 +425,7 @@ async function route(req, env, record, setViewer) {
     const [{rows,next},people,meet,unlock] = await Promise.all([feed(9,true),all(`SELECT r.id,r.name,r.dorm,r.nickname,${portrait} AS portrait FROM roster r ${seedJoin}
       WHERE EXISTS(SELECT 1 FROM submissions y WHERE y.subject=r.id AND y.contributor=r.id AND y.kind='self')
       ORDER BY random() LIMIT 12`,+pilot),meetSummary(),whatsappCompletion()]);
-    return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet,unlock),member,{home:true});
+    return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet,unlock),member,{home:true,active:'/'});
   }
   if (path==='/people' || path==='/reunion') {
   const completeness = `(2 * EXISTS(SELECT 1 FROM yearbook_public y WHERE y.member=r.id AND (y.fields<>'{}' OR y.images<>'[]'))
@@ -500,7 +500,7 @@ async function route(req, env, record, setViewer) {
       if (field.field==='section' && field.source==='selected_enrichment' && section) continue;
       details[field.field]=field.value;
     }
-    return render(row.name,page.person({...row,linkedin:imported['LinkedIn URL'],profileLinks:imported['Profile links']},attendanceNames[key===me?row.own_attendance:row.status],details,photos,stories,me,pilot,id(),Object.fromEntries(profilePhotos.map(photo=>[photo.slot,photo])),meet),member,{home:true});
+    return render(row.name,page.person({...row,linkedin:imported['LinkedIn URL'],profileLinks:imported['Profile links']},attendanceNames[key===me?row.own_attendance:row.status],details,photos,stories,me,pilot,id(),Object.fromEntries(profilePhotos.map(photo=>[photo.slot,photo])),meet),member,{home:true,active:'/people'});
   }
 
   if (path==='/profile') {
