@@ -99,7 +99,7 @@ export const socialScript = String.raw`
     }
   };
   const next=document.querySelector('[data-feed-next]');
-  if(next&&'IntersectionObserver' in window){
+  if(next&&!next.closest('[inert]')&&'IntersectionObserver' in window){
     let loading=false;
     next.classList.add('auto-feed');
     const observer=new IntersectionObserver(entries=>{
