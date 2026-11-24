@@ -530,3 +530,19 @@ test('admin can preview locked Insights without changing profiles or access',asy
  assert.equal((await call('/wa/?preview=locked',member)).status,403);
  assert.match((await call('/wa/?preview=locked')).headers.get('location'),/^\/signin/);
 });
+
+
+test('owner editing is visible and the full editor uses resolved profile values',async()=>{
+ const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
+ const own=await body(await call('/people/2',ck));
+ assert.match(own,/<a class="edit-toggle" href="\/profile">Edit profile<\/a>/);
+ assert.match(own,/aria-label="Upload profile photo"/);
+ assert.match(own,/aria-label="Upload Then photo"/);
+ assert.doesNotMatch(own,/data-edit-toggle|data-editable/);
+ const other=await body(await call('/people/1',ck));assert.doesNotMatch(other,/class="edit-toggle"|data-profile-edit/);
+ let editor=await body(await call('/profile',ck));assert.match(editor,/An imported bio/);assert.match(editor,/>D2<\/textarea>/);
+ await call('/profile',ck,{field:'life',value:'Owner answer'});
+ editor=await body(await call('/profile',ck));assert.match(editor,/Owner answer/);assert.doesNotMatch(editor,/An imported bio/);
+ await call('/profile',ck,{field:'life',value:''});
+ editor=await body(await call('/profile',ck));assert.doesNotMatch(editor,/An imported bio|Owner answer/);
+});
