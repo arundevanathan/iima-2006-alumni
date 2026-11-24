@@ -15,7 +15,7 @@ export const form=(action,body,label,extra='')=>`<form method="post" action="${e
 const action=(url,name,label,values={})=>form(url,field('action',name)+Object.entries(values).map(([key,val])=>field(key,val)).join(''),label,'class="inline"');
 const report=(type,target)=>`<details><summary>Report ${e(type)}</summary>${form('/report',field('type',type)+field('target',target)+area('reason','What needs checking?','','required maxlength="1000"'),'Send report')}</details>`;
 const list=(items,empty)=>items.length?`<ul class="plain">${items.map(item=>`<li>${item}</li>`).join('')}</ul>`:`<p>${e(empty)}</p>`;
-const labelFor=key=>({dorm:'Dorm number',nickname:'Dorm name',life:'Life, Lately',professionalFocus:'Professional focus',researchHighlight:'Selected work and achievements',firstDayAdvice:'Advice to my first-day self',outsideWork:'Outside work',reunionStory:'Reunion story',anythingElse:'Anything else',printName:'Yearbook name',moment:'A memorable moment'}[key]||key[0].toUpperCase()+key.slice(1));
+const labelFor=key=>({dorm:'Dorm number',nickname:'Dorm name',city:'Current city',life:'Life, Lately',professionalFocus:'Professional focus',researchHighlight:'Selected work and achievements',firstDayAdvice:'Advice to my first-day self',outsideWork:'Outside work',reunionStory:'Reunion story',anythingElse:'Anything else',printName:'Yearbook name',moment:'A memorable moment'}[key]||key[0].toUpperCase()+key.slice(1));
 const mediaSrc = (media,width) => `/media/${e(media)}?w=${width}`;
 const mediaSet = (media,widths) => widths.map(width=>`${mediaSrc(media,width)} ${width}w`).join(', ');
 const images=items=>items.length?`<div class="photos">${items.map(row=>`<figure><a href="/media/${e(row.media)}"><img src="${mediaSrc(row.media,256)}" srcset="${mediaSet(row.media,[256,480])}" sizes="(max-width: 520px) 45vw, 200px" loading="lazy" alt="${e(row.caption||'Batch photo')}"></a>${row.caption?`<figcaption>${e(row.caption)}</figcaption>`:''}</figure>`).join('')}</div>`:'<p>No published photos yet.</p>';
@@ -130,7 +130,7 @@ export function render(title,body,member,{home=false,active=null}={}) {
   .memory-nav{display:flex;flex-wrap:wrap;gap:.6rem 1.3rem;align-items:center;margin-bottom:1rem}.memory-feed{max-width:44rem}
   @media(max-width:600px){.directory-controls{grid-template-columns:1fr 1fr}.directory-controls label:first-child{grid-column:1/-1}}
   ${mobileNavCSS}
-  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=16" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=17" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
 }
 export function whatsappRequirements(details, photos={}) {
   return [['dorm','Dorm number'],['nickname','Dorm name'],['city','Current city'],['life','Life, Lately'],['family','Family']]
@@ -139,12 +139,16 @@ export function whatsappRequirements(details, photos={}) {
 }
 export function whatsappUnlock(checks, me, own=false) {
   const missing=checks.filter(check=>!check.complete), complete=!missing.length;
+  const target=key=>own?'#profile-field-'+key:'/people/'+me+'?complete=whatsapp#profile-field-'+key;
   return `<section class="panel whatsapp-unlock" id="whatsapp-unlock" aria-labelledby="whatsapp-unlock-title">
-    <h2 id="whatsapp-unlock-title">${complete?'Your WhatsApp Insights are unlocked':'Complete your profile to unlock WhatsApp Insights'}</h2>
-    <p>${complete?'Explore your personal WhatsApp story and the batch’s years together.':'Discover your WhatsApp story and the batch’s years together. Add all five profile details and both photos to unlock access.'}</p>
-    ${complete?'':`<p><strong>${checks.length-missing.length} of ${checks.length} requirements complete</strong></p><ul class="unlock-checklist">${checks.map(check=>`<li><span aria-hidden="true">${check.complete?'✓':'○'}</span> ${e(check.label)} <small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul><p>Optional prompts and “Anything else” are not required.</p>`}
-    <a class="cta profile-primary" ${own&&!complete?'data-unlock-edit ':''}href="${complete?'/wa/':'/people/'+me+'?complete=whatsapp#whatsapp-unlock'}">${complete?'View WhatsApp Insights':'Complete my profile'}</a>
+    <h2 id="whatsapp-unlock-title">${complete?'Your WhatsApp Insights are unlocked':own?'Complete these 7 items to unlock everything':'Complete your profile to unlock WhatsApp Insights'}</h2>
+    <p>${complete?'Your memories, WhatsApp Insights and catch-up requests are unlocked.':own?'Unlock memories, WhatsApp Insights and the names of classmates who want to catch up. Only the five details and two photos below are required.':'Discover your WhatsApp story and the batch’s years together. Complete these five details and both photos.'}</p>
+    ${complete?'':`<p><strong>${checks.length-missing.length} of ${checks.length} requirements complete</strong></p><ul class="unlock-checklist">${checks.map(check=>`<li class="${check.complete?'is-complete':'is-required'}"><span aria-hidden="true">${check.complete?'✓':'○'}</span> ${check.complete?`<span>${e(check.label)}</span>`:`<a href="${target(check.key)}"${own?` data-required-jump="${check.key}"`:''}>Add ${e(check.label)}</a>`} <small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul><p class="unlock-optional-note">Your profile picture, company, education and optional questions are not required.</p>`}
+    <a class="cta profile-primary" ${own&&!complete?`data-unlock-edit data-required-jump="${missing[0].key}"`:''}href="${complete?'/wa/':target(missing[0].key)}">${complete?'View WhatsApp Insights':own?'Add next required item':'Complete my profile'}</a>
   </section>`;
+}
+export function catchupLocked(count,me) {
+  return `<div class="catchup-locked"><div class="catchup-mask" inert aria-hidden="true">${Array.from({length:Math.min(count,3)},()=>'<span class="catchup-mask-person"><i></i><b>A classmate</b></span>').join('')}</div><p><strong>${count} ${count===1?'classmate wants':'classmates want'} to catch up with you</strong></p><p>Complete your profile to see who and respond.</p><a class="cta profile-primary" href="/people/${me}?complete=whatsapp#whatsapp-unlock">Complete my profile</a></div>`;
 }
 export function memoriesCompletionPrompt(content,checks,me) {
   const missing=checks.filter(item=>!item.complete);
@@ -295,6 +299,9 @@ export const page={
     const allEntryKeys = Object.keys(details).filter(key=>!facts.includes(key)&&key!=='displayName'&&(hasValue(key)||(own&&key!=='researchHighlight')));
     const entryKeys = allEntryKeys.filter(key=>hasValue(key)&&key!=='life');
     const todoKeys = own ? [...facts,...allEntryKeys].filter(key=>!hasValue(key)) : [];
+    const requirements=whatsappRequirements(details,profilePhotos),requiredKeys=new Set(['dorm','nickname','city','life','family']);
+    const requiredTodo=todoKeys.filter(key=>requiredKeys.has(key)),optionalTodo=todoKeys.filter(key=>!requiredKeys.has(key));
+    const requiredMark=key=>own&&requiredKeys.has(key)&&!hasValue(key)?'<span class="required-badge">Required to unlock</span>':'';
     const linkedin = /^https:\/\/(?:www\.)?linkedin\.com\/in\//i.test(row.linkedin||'')
       ? `<a class="profile-secondary" href="${e(row.linkedin)}" rel="noreferrer">LinkedIn${extIcon}</a>` : '';
     const profileLinks = (Array.isArray(row.profileLinks) ? row.profileLinks : []).flatMap(item => {
@@ -310,7 +317,7 @@ export const page={
       ${form('/profile',field('field',key)+control,'Save','data-profile-edit')}</details>` : '';
     const entry = key => {
       const label = ({dorm:'Dorm number',nickname:'Dorm name'})[key] || labelFor(key);
-      return `<div class="editable-field${key==='moment'?' entry-moment':''}"><dt>${e(label)}</dt><dd class="field-display">${details[key]?e(details[key]):'<span class="field-empty">Not added yet</span>'}</dd>${edit(key,label,details[key])}</div>`;
+      return `<div ${own?`id="profile-field-${key}" data-required-field="${key}" ${requiredKeys.has(key)&&!hasValue(key)?'data-required-missing':''}`:''} class="editable-field${key==='moment'?' entry-moment':''}${own&&requiredKeys.has(key)&&!hasValue(key)?' profile-required-missing':''}"><dt>${e(key==='city'?'Current city':label)}${requiredMark(key)}</dt><dd class="field-display">${details[key]?e(details[key]):'<span class="field-empty">Not added yet</span>'}</dd>${edit(key,label,details[key])}</div>`;
     };
     return `<div class="alumni-profile">
       <header class="profile-header">
@@ -323,7 +330,7 @@ export const page={
           <div class="profile-name editable-field"><h1 class="field-display">${e(details.displayName||row.name)}</h1>
             ${hasValue('nickname')?`<p class="nickname">“${e(details.nickname)}”</p>`:''}
             ${(()=>{const reg=[hasValue('section')&&'Section '+details.section,hasValue('dorm')&&dormLabel(details.dorm.trim()),'PGP 2004–06'].filter(Boolean).join(' · ');return `<p class="registry profile-registry">${e(reg)}</p>`;})()}
-            ${hasValue('life')?`<div class="editable-field profile-lede-field"><p class="profile-lede field-display">${e(details.life)}</p>${edit('life',labelFor('life'),details.life)}</div>`:''}
+            ${hasValue('life')?`<div id="profile-field-life" data-required-field="life" class="editable-field profile-lede-field"><p class="profile-lede field-display">${e(details.life)}</p>${edit('life',labelFor('life'),details.life)}</div>`:''}
             ${edit('displayName','Name',details.displayName||row.name)}
             <div class="editable-field profile-rsvp">
               ${status?`<span class="profile-status field-display">${e(status)}</span>`:''}
@@ -339,13 +346,14 @@ export const page={
           </div>
         </div>
       </header>
-      ${own?whatsappUnlock(whatsappRequirements(details,profilePhotos),me,true):''}
+      ${own?whatsappUnlock(requirements,me,true):''}
       ${pilot?'<p class="profile-pilot">Profiles are being checked during the pilot.</p>':''}
       <div class="profile-layout${factKeys.length||photos.length||todoKeys.length?'':' profile-layout-wide'}">
         ${factKeys.length||photos.length||todoKeys.length?`<aside class="profile-sidebar">
           ${factKeys.length?`<section class="profile-section"><h2>About</h2><dl class="profile-facts">${factKeys.map(entry).join('')}</dl></section>`:''}
-          ${todoKeys.length?`<section class="profile-section profile-todo"><details><summary><h2>Complete your page</h2><span class="registry">${todoKeys.length} to add · only you see this</span></summary>
-            <dl class="profile-facts">${todoKeys.map(entry).join('')}</dl></details></section>`:''}
+          ${todoKeys.length?`<section class="profile-section profile-todo"><details${requiredTodo.length?' open':''}><summary><h2>${requiredTodo.length?'Required profile details':'More about you'}</h2><span class="registry">${requiredTodo.length} required · ${optionalTodo.length} optional</span></summary>
+            ${requiredTodo.length?`<p class="required-help">Complete the highlighted details below to unlock access. Add your Then and Now photos in the photo section.</p><dl class="profile-facts">${requiredTodo.map(entry).join('')}</dl>`:''}
+            ${optionalTodo.length?`<details class="optional-profile-fields"><summary>Optional details — not needed to unlock</summary><dl class="profile-facts">${optionalTodo.map(entry).join('')}</dl></details>`:''}</details></section>`:''}
           ${photos.length?`<section class="profile-section profile-photos"><div class="profile-section-head"><h2>Photos</h2>
             <a href="/gallery?person=${row.id}">View all</a></div>${images(photos.slice(0,4))}</section>`:''}
         </aside>`:''}
@@ -353,7 +361,8 @@ export const page={
           ${own&&meet.available?`<section class="profile-section profile-meet" id="meet"><h2>Looking to catch up</h2>
             <p class="meet-count">${meetCountLine(meet.count)}</p>
             <p class="meet-hint">Send requests to classmates you want to catch up with in Jaipur. They’ll see your name and can accept. You’ll be notified when they accept.</p>
-            ${meet.incoming?.length?`<h3>Requests received</h3><ul class="meet-list">${meet.incoming.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong><small>${person.accepted_at?'Accepted':'Wants to catch up with you'}</small></span></a>${person.accepted_at?'<span class="meet-status">Accepted</span>':meetForm('accept',person.id,'/people/'+me+'#meet','Accept request','',person.request_id)}</li>`).join('')}</ul>`:''}
+            ${meet.incoming?.length&&!meet.unlocked?catchupLocked(meet.count,me):''}
+            ${meet.unlocked&&meet.incoming?.length?`<h3>Requests received</h3><ul class="meet-list">${meet.incoming.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong><small>${person.accepted_at?'Accepted':'Wants to catch up with you'}</small></span></a>${person.accepted_at?'<span class="meet-status">Accepted</span>':meetForm('accept',person.id,'/people/'+me+'#meet','Accept request','',person.request_id)}</li>`).join('')}</ul>`:''}
             ${meet.picked.length?'<h3>Requests sent</h3>':''}
             ${meet.picked.length?`<ul class="meet-list">${meet.picked.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong><small>${person.accepted_at?'Accepted':'Awaiting response'}</small></span></a>${meetForm('remove',person.id,'/people/'+me+'#meet','Remove','meet-remove')}</li>`).join('')}</ul>`:''}
             <div class="meet-search" data-meet-picker data-picked="${meet.picked.map(person=>person.id).join(',')}">
@@ -365,12 +374,12 @@ export const page={
           ${own||Object.keys(profilePhotos).length?`<section class="profile-section profile-then-now"><h2>Then / Now</h2>
             <div class="then-now-grid">${['then','now'].map(slot=>{
               const photo=profilePhotos[slot], label=slot==='then'?'Then':'Now';
-              return `<div class="then-now-slot"><h3>${label} <span>${slot==='then'?'2006':'2026'}</span></h3>
+              return `<div ${own?`id="profile-field-${slot}" data-required-field="${slot}" ${!photo?'data-required-missing':''}`:''} class="then-now-slot${own&&!photo?' profile-required-missing':''}"><h3>${label} <span>${slot==='then'?'2006':'2026'}</span></h3>${own&&!photo?'<p class="required-badge">Required to unlock</p>':''}
                 ${photo?`<a href="/media/${e(photo.media)}"><img src="${mediaSrc(photo.media,480)}" alt="${e(photo.caption||label+' photo of '+row.name)}" loading="lazy"></a>`:
                  `<p>${own?'Add a '+label.toLowerCase()+' photo.':'No photo shared.'}</p>`}
                 ${own?`<form action="/profile" method="post" enctype="multipart/form-data" data-profile-edit>
                   ${field('field',slot+'PhotoObject')}<input type="file" name="photo" accept="image/jpeg,image/png" hidden>
-                  ${icon('edit','Upload '+label+' photo','data-upload')}</form>`:''}</div>`;
+                  <button type="button" data-upload class="required-photo-button" aria-label="Upload ${label} photo">${photo?'Change':'Add'} ${label} photo</button></form>`:''}</div>`;
             }).join('')}</div></section>`:''}
           ${entryKeys.length?`<section class="profile-section"><dl class="profile-entry">${entryKeys.map(entry).join('')}</dl></section>`:''}
           ${profileLinks.length?`<section class="profile-section"><h2>Selected links</h2><ul>${profileLinks.join('')}</ul></section>`:''}
@@ -385,8 +394,13 @@ export const page={
       <div class="profile-report">${report('profile',row.id)}</div>
     </div>`;
   },
-  editProfile(fields,member){const keys=['life','city','company','education','dorm','family','nickname'];
-    return `<p><a href="/people/${member.id}">Back to my profile</a></p><p>Edit your details below. You can change your profile photo and Then / Now photos on your profile page.</p>`+form('/profile',keys.map(k=>area(k,labelFor(k),fields[k])+checkbox('hide_'+k,'Hide '+labelFor(k),fields[k]==='')).join('')+checkbox('attendance_private','Hide my attendance status',!!member.attendance_private),'Save profile');},
+  editProfile(fields,member,checks=[]){
+    const required=['dorm','nickname','city','life','family'],optional=['company','education'];
+    const rows=keys=>keys.map(k=>`<div class="${required.includes(k)&&!String(fields[k]||'').trim()?'profile-required-missing':''}">${area(k,labelFor(k)+(required.includes(k)?' (Required to unlock)':''),fields[k])}${checkbox('hide_'+k,'Hide '+labelFor(k),fields[k]==='')}</div>`).join('');
+    return `<p><a href="/people/${member.id}">Back to my profile</a></p><p>Unlock memories, WhatsApp Insights and incoming catch-up identities by completing the five details and both photos. Hiding a required detail keeps access locked.</p>`+
+      form('/profile','<fieldset><legend>5 required profile details</legend>'+rows(required)+'</fieldset><details class="optional-profile-fields"><summary>Optional career details</summary>'+rows(optional)+'</details>'+checkbox('attendance_private','Hide my attendance status',!!member.attendance_private),'Save profile')+
+      `<section class="panel"><h2>2 required photos</h2><p>Add these on your profile page. Your profile picture does not count as either photo.</p><ul class="unlock-checklist">${['then','now'].map(key=>`<li><a href="/people/${member.id}?complete=whatsapp#profile-field-${key}">${key==='then'?'Then photo (2006)':'Now photo (2026)'}</a><small>${checks.find(item=>item.key===key)?.complete?'Complete':'Required'}</small></li>`).join('')}</ul></section>`;
+  },
   images,
   topics(rows,q){return `<form method="get">${input('q','Find a memory topic',q)}<button>Search</button></form><p>${link('/compose','Create a topic and add a memory')}</p>`+list(rows.map(r=>link('/topics/'+r.id,r.title)+' '+badge(r.kind)),'No topics yet.');},
   topic(row,rows){return `${badge(row.kind)}<p>${link('/compose?topic='+row.id,'Add your memory')}</p>${memoryBatch(rows)}${memoryDialog()}${report('topic',row.id)}`;},
@@ -423,12 +437,13 @@ export const page={
       `<details class="comment-menu"><summary aria-label="Comment options">⋯</summary><div>${action(url,'delete-comment','Delete comment',{comment:c.id})}</div></details><details><summary>Edit comment</summary>${form(url,field('action','edit-comment')+field('comment',c.id)+input('body','Comment',c.body,'required'),'Save')}</details>`:''}${report('comment',c.id)}<p class="story">${e(c.body)}</p></div>`),'No comments yet.')+
       (()=>{const composer=form(url,field('action','comment')+area('body','Add a comment','','required maxlength="1200"'),'Post comment');return commentPosted?`<details><summary>Add another comment</summary>${composer}</details>`:composer;})();
   },
-  notifications(rows,me){
+  notifications(rows,me,unlocked=true){
     const labels={mention:'mentioned you',like:'liked your memory',comment:'commented on your memory',tag:'added a tag to your memory',catchup_request:'wants to catch up with you',catchup_accepted:'accepted your catch-up request'};
     const dates=new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Kolkata'});
     return `<div class="notification-actions">${rows.some(n=>!n.is_read)?form('/notifications',field('action','read-all'),'Mark all read'):''}
       ${rows.some(n=>n.sample)?form('/notifications',field('action','clear-samples'),'Remove test notifications'):''}</div>
       ${rows.length?`<section aria-label="Recent activity" class="notification-feed">${rows.map(n=>{
+        if(n.kind==='catchup_request'&&!unlocked)return `<article class="notification-card${n.is_read?'':' new'}"><p class="notification-locked-label">${n.is_read?'Catch-up request':'New catch-up request'}</p>${catchupLocked(1,me)}</article>`;
         const url='/notifications?open='+n.id;
         const catchup=n.kind==='catchup_request'||n.kind==='catchup_accepted';
         const requestAction=n.kind==='catchup_request'?(n.meet_request?(n.meet_accepted?'<p class="meet-status">You accepted this request.</p>':meetForm('accept',n.actor,'/notifications','Accept request','notification-accept',n.meet_request)):'<p class="meet-hint">This request is no longer active.</p>'):'';
