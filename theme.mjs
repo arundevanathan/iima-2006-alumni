@@ -608,8 +608,6 @@ time,small{color:var(--muted)}
 .site-footer>div{max-width:1280px;margin:auto;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:1.2rem 2rem}
 .site-footer .reunion-title{font:700 clamp(1.8rem,4vw,2.8rem)/1.05 var(--serif);letter-spacing:-.015em;color:var(--on-photo);margin:0}
 .site-footer p:not(.reunion-title){margin:.4rem 0 0;font:500 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#b8b2a7}
-.site-footer nav{display:flex;gap:.4rem 1.2rem;margin:0}.site-footer nav a{color:#e6ded2;font-size:.88rem}
-.site-footer nav a:hover{color:#fff}
 
 /* Compact mobile content; bottom navigation is shared in navigation.mjs. */
 @media(max-width:650px){
@@ -872,9 +870,32 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
   .site-footer .footer-brand>p:not(.reunion-title){font-size:.75rem;line-height:1.6;letter-spacing:.045em;margin-top:.6rem}
   .footer-tagline{display:block}.footer-tagline::before{content:none}
   .site-footer .footer-controls{display:grid;justify-items:start;gap:.75rem}
-  .site-footer nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;align-items:center;gap:.15rem .6rem}
-  .site-footer nav a{display:flex;align-items:center;min-height:40px;margin:0;padding:.25rem 0;font-size:.875rem;line-height:1.3;text-decoration:none}
   .site-footer .footer-theme{padding-top:.6rem;border-top:1px solid #ffffff20;width:100%}
   .site-footer .footer-theme button{margin:0}
 }
+
+/* One completion summary on owner profiles; navigation stays in the app bar. */
+.profile-completion-summary{margin:1rem 0}
+.profile-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+.profile-progress-heading h2{margin:0;font-size:1.5rem}
+.profile-progress-heading strong{font-size:.9rem;white-space:nowrap;color:var(--muted)}
+.profile-completion-summary>p{font-size:1rem;margin:.75rem 0}
+.profile-completion-summary progress{display:block;width:100%;height:6px;margin-top:.75rem;accent-color:var(--brick);border:0;border-radius:999px;overflow:hidden;background:var(--line)}
+.profile-completion-summary progress::-webkit-progress-bar{background:var(--line)}
+.profile-completion-summary progress::-webkit-progress-value{background:var(--brick)}
+.profile-missing-items{display:flex;flex-wrap:wrap;gap:.45rem;list-style:none;padding:0;margin:.75rem 0 1rem}
+.profile-missing-items a{display:inline-flex;align-items:center;min-height:40px;padding:.4rem .65rem;border:1px solid var(--brick-fired);border-radius:var(--r);color:var(--brick);font-size:.95rem;text-decoration:none;background:var(--brick-wash)}
+.profile-all-requirements{margin-top:.9rem;font-size:.9rem;color:var(--muted)}
+.profile-all-requirements>summary{margin:0;min-height:36px;display:flex;align-items:center;text-decoration:underline;text-underline-offset:.2em}
+.profile-all-requirements>p{font-size:.9rem}.profile-all-requirements>summary::after{content:'+';margin-left:auto}.profile-all-requirements[open]>summary::after{content:'−'}
+.catchup-inline-mask{margin:.6rem 0}
+.catchup-inline-mask>p{font-size:.95rem;color:var(--muted)}
+@media(max-width:730px){
+  .profile-layout{align-items:stretch}
+  .profile-layout .profile-section{width:100%;box-sizing:border-box}
+  .is-owner .profile-layout .profile-todo.has-required{order:0}
+  .is-owner .profile-layout .profile-meet{order:4}
+  .is-owner .profile-layout .profile-todo:not(.has-required){order:5}
+}
+@media(max-width:650px){.site-footer{margin-top:1.5rem!important;padding:1.25rem 16px!important}.site-footer .footer-controls{gap:0}.site-footer .footer-theme{padding-top:.75rem}.profile-progress-heading{align-items:baseline}}
 `;
