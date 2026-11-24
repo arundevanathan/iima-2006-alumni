@@ -903,4 +903,25 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
 .profile-lede-field .profile-lede{margin-top:0!important}
 [data-logout-status]{font-size:.9rem;color:var(--ink);max-width:18rem;white-space:normal}
 [data-logout-status]:empty{display:none}
+
+.reunion-details-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:.75rem;list-style:none;margin:0;min-height:44px}
+.reunion-details-panel>summary::-webkit-details-marker{display:none}
+.reunion-details-panel>summary h2{margin:0}
+.reunion-details-panel>summary>span{font-size:.875rem;color:var(--muted);margin-left:auto;text-align:right}
+.reunion-details-panel>summary::after{content:'+';font-size:1.4rem;color:var(--brick)}
+.reunion-details-panel[open]>summary::after{content:'−'}
+.reunion-details-panel[open]>summary{margin-bottom:1rem}
+#reunion-details,#reunion-attendees{scroll-margin-top:80px}
+@media(max-width:650px){
+  .reunion-page .directory-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+  .reunion-page .directory-card{min-width:0;overflow:hidden}
+  .member-site .reunion-page .directory-card :is(img,.initials){width:100%;aspect-ratio:1;object-fit:cover;object-position:center 30%;font-size:1.75rem}
+  .reunion-page .directory-card>div{padding:.55rem}
+  .reunion-page .directory-card strong{font-size:.95rem;line-height:1.25;overflow-wrap:anywhere}
+  .reunion-page .directory-card .nickname{font-size:.85rem}
+  .reunion-page .directory-card .registry{font-size:.65rem;letter-spacing:.03em}
+  .reunion-details-panel>summary{flex-wrap:wrap;gap:.4rem}
+  .reunion-details-panel>summary h2{font-size:1.2rem}
+  .reunion-details-panel>summary>span{font-size:.8rem;max-width:9rem}
+}
 `;
