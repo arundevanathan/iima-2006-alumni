@@ -396,7 +396,7 @@ nav{margin:0;gap:3px;align-items:center}nav a{font-size:.86rem;padding:.48rem .6
   .member-site .bar .notification-bell{margin-inline-end:.15rem;width:39px;height:44px}
   .member-site .bar .account summary{min-width:40px;min-height:44px;display:grid;place-items:center}
   .member-site main{padding: .65rem .8rem 1.2rem}
-  .member-site main:not(:has(>.alumni-home,.alumni-profile,.memory-toolbar,.classmates-directory)){margin:.55rem .5rem}
+  .member-site main:not(:has(>.alumni-home,.alumni-profile,.memory-toolbar,.classmates-directory)){margin:.55rem 0}
   .member-site main>h1{font-size:clamp(1.85rem,7.5vw,2.6rem);margin:.2rem 0 .75rem}
   .alumni-home .campus-hero{min-height:0;padding:1.15rem .8rem 1rem;align-items:center}
   .alumni-home{background:transparent}
@@ -611,14 +611,11 @@ time,small{color:var(--muted)}
 .site-footer nav{display:flex;gap:.4rem 1.2rem;margin:0}.site-footer nav a{color:#e6ded2;font-size:.88rem}
 .site-footer nav a:hover{color:#fff}
 
-/* Mobile: bottom tab bar replaces the hamburger */
+/* Compact mobile content; bottom navigation is shared in navigation.mjs. */
 @media(max-width:650px){
-  .member-site{--mast-height:52px;padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+  .member-site{--mast-height:52px}
   .wm-class{display:none}
   .member-site .mobile-menu{display:none}
-  .member-site .desktop-menu{display:flex;position:fixed;inset:auto 0 0 0;z-index:20;justify-content:space-around;gap:0;height:calc(58px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--paper);border-top:1px solid var(--concrete);box-shadow:0 -6px 20px #2118120f}
-  .member-site .desktop-menu>a{flex:1;display:grid;place-items:center;font-size:.78rem;padding:0;border-bottom:0;border-top:3px solid transparent;min-height:56px}
-  .member-site .desktop-menu>a[aria-current=page]{border-top-color:var(--brick)}
   .member-site main>h1{font-size:clamp(1.9rem,8vw,2.4rem)}
   .page-band main>h1{min-height:130px}
   .alumni-home .campus-hero{flex-direction:column;align-items:stretch}
