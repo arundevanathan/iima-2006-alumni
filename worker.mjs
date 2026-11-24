@@ -404,7 +404,7 @@ async function route(req, env, record, setViewer) {
     const q=(u.searchParams.get('q')||'').trim().slice(0,100);
     const {rows,next} = await feed(12,u.searchParams.get('featured')==='1',q);
     if (u.searchParams.get('fragment')==='1') return json({html:page.memoryCards(rows),next});
-    return show('Memories',page.memories(rows,next,q,id()));
+    return show('Memories',page.memories(rows,next,q,id(),await whatsappCompletion(),me));
   }
   if (path==='/memory-targets' && !post) {
     const raw=(u.searchParams.get('q')||'').trim().slice(0,100);
