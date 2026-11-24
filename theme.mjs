@@ -819,4 +819,23 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
 .meet-list .meet-form button{white-space:nowrap}
 .meet-status{color:var(--brick);font-weight:600;font-size:.95rem}
 .notification-card>.meet-status,.notification-card>.meet-hint{margin:0 .85rem .85rem}
+
+/* Profile-completion incentive: the actual feed remains beneath a visual blur. */
+.memories-gate{position:relative;isolation:isolate;display:grid;align-items:center;overflow:hidden;min-height:430px;margin:.5rem 0 1rem;border:1px solid var(--line);border-radius:var(--r);background:var(--lime)}
+.memories-gate-content{grid-area:1/1;min-width:0;min-height:430px;max-height:560px;overflow:hidden;filter:blur(10px);opacity:.65;pointer-events:none;user-select:none;-webkit-user-select:none}
+.memories-gate-prompt{grid-area:1/1;position:relative;z-index:1;justify-self:center;width:calc(100% - 40px);max-width:560px;box-sizing:border-box;margin:24px 20px;padding:clamp(20px,4vw,30px);background:var(--paper);background:color-mix(in srgb,var(--paper) 93%,transparent);border:1px solid var(--concrete);border-top:3px solid var(--brick);border-radius:var(--r);backdrop-filter:blur(16px);box-shadow:0 10px 35px #00000026;color:var(--ink)}
+.memories-gate-prompt h2{font:650 clamp(1.45rem,4.8vw,2rem)/1.12 var(--serif);margin:.5rem 0 .8rem}
+.memories-gate-prompt p{font-size:1rem;line-height:1.5;margin:.6rem 0}
+.memories-gate-prompt .registry{font-size:.875rem}
+.memories-gate-prompt .memories-gate-progress{margin:1rem 0 .35rem}
+.memories-gate-prompt progress{display:block;width:100%;height:7px;accent-color:var(--brick);border:0;border-radius:999px;overflow:hidden;background:var(--line)}
+.memories-gate-prompt progress::-webkit-progress-bar{background:var(--line)}
+.memories-gate-prompt progress::-webkit-progress-value{background:var(--brick)}
+.memories-gate-prompt progress::-moz-progress-bar{background:var(--brick)}
+.memories-gate-prompt .memories-gate-needed{font-size:.875rem;color:var(--muted);margin:1rem 0 .4rem}
+.memories-gate-requirements{display:flex;flex-wrap:wrap;gap:.4rem;list-style:none;margin:0 0 1.25rem;padding:0}
+.memories-gate-requirements li{font-size:.875rem;line-height:1.35;padding:.3rem .5rem;border:1px solid var(--line);border-radius:var(--r);background:var(--tint)}
+.memories-gate-prompt .cta{margin-top:1rem;min-height:44px;text-decoration:none;font-size:1rem}
+@media(max-width:650px){.memories-gate-prompt{width:calc(100% - 24px);margin:18px 12px}.memories-gate-prompt .cta{display:flex;justify-content:center;width:100%}}
+@media print{.memories-gate-content{visibility:hidden}}
 `;
