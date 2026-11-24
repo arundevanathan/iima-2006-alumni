@@ -221,7 +221,9 @@ async function route(req, env, record, setViewer) {
       instr(lower(name||' '||nickname),lower(?))>0 ORDER BY name LIMIT 12`,me,q));
   }
   const admin = member.role === 'admin';
-  async function whatsappCompletion() {
+  let completionPromise;
+  function whatsappCompletion() {
+    return completionPromise ||= (async()=>{
     const [roster, selected, photos] = await Promise.all([
       one('SELECT dorm,nickname FROM roster WHERE id=?',me),
       all('SELECT field,value FROM selected_profile_fields WHERE member=? AND pilot_only<=? ORDER BY priority',me,+pilot),
@@ -234,6 +236,7 @@ async function route(req, env, record, setViewer) {
     const details={...roster};
     for (const item of selected) details[item.field]=item.value;
     return whatsappRequirements(details,Object.fromEntries(photos.map(photo=>[photo.slot,true])));
+    })();
   }
   if (!post && (path==='/wa' || path.startsWith('/wa/'))) {
     if (path==='/wa/' && u.searchParams.get('preview')==='locked') {
@@ -365,15 +368,16 @@ async function route(req, env, record, setViewer) {
   const meetLimit = 60;
   async function meetSummary(target=null) {
     try {
-      const [count,picked,wanted,incoming] = await Promise.all([
+      const [count,picked,wanted,incoming,checks] = await Promise.all([
         one('SELECT count(*) AS n FROM meet_wishes WHERE target=?',me),
         all(`SELECT r.id,r.name,r.nickname,r.dorm,w.request_id,w.accepted_at,${portrait} AS portrait FROM meet_wishes w JOIN roster r ON r.id=w.target ${seedJoin}
           WHERE w.member=? ORDER BY w.created DESC,r.name`,+pilot,me),
         target==null ? null : one('SELECT request_id,accepted_at FROM meet_wishes WHERE member=? AND target=?',me,target),
         all(`SELECT r.id,r.name,r.nickname,w.request_id,w.accepted_at,${portrait} AS portrait FROM meet_wishes w JOIN roster r ON r.id=w.member ${seedJoin}
-          WHERE w.target=? ORDER BY w.created DESC,r.name`,+pilot,me)
+          WHERE w.target=? ORDER BY w.created DESC,r.name`,+pilot,me),
+        whatsappCompletion()
       ]);
-      return {available:true,count:count.n,picked,wanted:!!wanted,accepted:!!wanted?.accepted_at,incoming};
+      return {available:true,count:count.n,picked,wanted:!!wanted,accepted:!!wanted?.accepted_at,incoming,unlocked:checks.every(check=>check.complete)};
     } catch { return {available:false,count:0,picked:[],wanted:false}; }
   }
   if (path==='/meet' && post) {
@@ -387,6 +391,7 @@ async function route(req, env, record, setViewer) {
       const request=str(f,'request',80);
       const wish=await one('SELECT request_id FROM meet_wishes WHERE member=? AND target=? AND request_id=?',target,me,request);
       if (!wish) return missing();
+      if((await whatsappCompletion()).some(check=>!check.complete))return redirect('/people/'+me+'?complete=whatsapp#whatsapp-unlock');
       // Only the recipient may accept this exact request; a retry never sends a second event.
       await run('UPDATE meet_wishes SET accepted_at=? WHERE member=? AND target=? AND request_id=? AND accepted_at IS NULL',now(),target,me,request);
       return redirect(back);
@@ -510,7 +515,7 @@ async function route(req, env, record, setViewer) {
         all('SELECT field,value FROM selected_profile_fields WHERE member=? AND pilot_only<=? ORDER BY priority',me,+pilot)
       ]);
       const values={...roster};for(const item of fields)values[item.field]=item.value;
-      return show('Edit profile',page.editProfile(values,member));
+      return show('Edit profile',page.editProfile(values,member,await whatsappCompletion()));
     }
     const f = await data();
     const inline = f.get('field');
@@ -790,7 +795,7 @@ async function route(req, env, record, setViewer) {
       LEFT JOIN comments c ON n.kind='comment' AND c.id=substr(n.anchor,9) AND c.post=p.id AND c.hidden=0
       WHERE n.recipient=? AND ${notificationVisible}
       ORDER BY n.created DESC,n.id DESC LIMIT 100`,+pilot,me);
-    return show('Notifications',page.notifications(rows,me));
+    return show('Notifications',page.notifications(rows,me,(await whatsappCompletion()).every(check=>check.complete)));
   }
   if (path==='/admin/analytics' && admin && !post) {
     const days=u.searchParams.get('days')==='90'?90:30;
