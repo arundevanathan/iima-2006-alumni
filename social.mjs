@@ -25,6 +25,9 @@ export const socialScript = String.raw`
     toggle.hidden=false;
     const set=on=>{profile.classList.toggle('is-editing',on);toggle.setAttribute('aria-pressed',String(on));toggle.textContent=on?'Done editing':'Edit page';};
     toggle.addEventListener('click',()=>set(!profile.classList.contains('is-editing')));
+    const startUnlockEdit=()=>{set(true);const todo=profile.querySelector('.profile-todo>details');if(todo)todo.open=true;};
+    if(new URLSearchParams(location.search).get('complete')==='whatsapp')startUnlockEdit();
+    profile.querySelector('[data-unlock-edit]')?.addEventListener('click',event=>{event.preventDefault();startUnlockEdit();toggle.scrollIntoView({block:'center',behavior:'smooth'});});
     try{if(sessionStorage.getItem('profile-editing')==='1') set(true);}catch{}
     addEventListener('pagehide',()=>{try{sessionStorage.setItem('profile-editing',profile.classList.contains('is-editing')?'1':'0');}catch{}});
   }
@@ -506,12 +509,14 @@ export const socialScript = String.raw`
         const response=await fetch(form.action,{method:'POST',body:data,headers:{Accept:'application/json'}});
         if(!response.ok)throw new Error(await response.text());
         if(response.headers.get('Content-Type')?.includes('application/json')){
+          if(form.matches('[data-profile-edit]')){location.reload();return;}
           const {value}=await response.json();
           const editor=form.closest('details');
           editor.parentElement.querySelector('.field-display').textContent=value||'—';
           editor.open=false;
           return;
         }
+        if(form.matches('[data-profile-edit]')){location.reload();return;}
         const next=new DOMParser().parseFromString(await response.text(),'text/html');
         const updated=next.querySelector('.alumni-profile');
         if(!updated)throw new Error('Could not update the profile. Try again.');
