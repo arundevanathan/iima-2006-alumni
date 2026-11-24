@@ -130,7 +130,7 @@ export function render(title,body,member,{home=false,active=null}={}) {
   .memory-nav{display:flex;flex-wrap:wrap;gap:.6rem 1.3rem;align-items:center;margin-bottom:1rem}.memory-feed{max-width:44rem}
   @media(max-width:600px){.directory-controls{grid-template-columns:1fr 1fr}.directory-controls label:first-child{grid-column:1/-1}}
   ${mobileNavCSS}
-  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=15" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=16" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
 }
 export function whatsappRequirements(details, photos={}) {
   return [['dorm','Dorm number'],['nickname','Dorm name'],['city','Current city'],['life','Life, Lately'],['family','Family']]
@@ -144,6 +144,23 @@ export function whatsappUnlock(checks, me, own=false) {
     <p>${complete?'Explore your personal WhatsApp story and the batch’s years together.':'Discover your WhatsApp story and the batch’s years together. Add all five profile details and both photos to unlock access.'}</p>
     ${complete?'':`<p><strong>${checks.length-missing.length} of ${checks.length} requirements complete</strong></p><ul class="unlock-checklist">${checks.map(check=>`<li><span aria-hidden="true">${check.complete?'✓':'○'}</span> ${e(check.label)} <small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul><p>Optional prompts and “Anything else” are not required.</p>`}
     <a class="cta profile-primary" ${own&&!complete?'data-unlock-edit ':''}href="${complete?'/wa/':'/people/'+me+'?complete=whatsapp#whatsapp-unlock'}">${complete?'View WhatsApp Insights':'Complete my profile'}</a>
+  </section>`;
+}
+export function memoriesCompletionPrompt(content,checks,me) {
+  const missing=checks.filter(item=>!item.complete);
+  if(!missing.length)return content;
+  return `<section class="memories-gate" aria-label="Memories available after profile completion">
+    <div class="memories-gate-content" inert aria-hidden="true">${content}</div>
+    <div class="memories-gate-prompt" role="region" aria-labelledby="memories-gate-title">
+      <span class="registry">Your batch’s stories await</span>
+      <h2 id="memories-gate-title">Complete your profile to access memories</h2>
+      <p>Add your details and Then / Now photos to explore the batch’s stories, photos and WhatsApp Insights.</p>
+      <p class="memories-gate-progress"><strong>${checks.length-missing.length} of ${checks.length} complete</strong></p>
+      <progress max="${checks.length}" value="${checks.length-missing.length}" aria-label="Profile completion"></progress>
+      <a class="cta profile-primary" href="/people/${me}?complete=whatsapp#whatsapp-unlock">Complete my profile</a>
+      <p class="memories-gate-needed">Still needed</p>
+      <ul class="memories-gate-requirements">${missing.map(item=>`<li>${e(item.label)}</li>`).join('')}</ul>
+    </div>
   </section>`;
 }
 export const page={
@@ -185,14 +202,14 @@ export const page={
       <section class="home-classmates"><div class="section-head"><h2>What are they up to?</h2>${link('/people','See all')}</div>
         <div class="people-grid" role="region" aria-label="What are they up to? Scroll to browse classmates" data-classmate-strip tabindex="0">${people.map(row=>`<a class="person-tile" href="/people/${row.id}">${portrait(row,true,256)}<div>${classmate(row)}</div></a>`).join('')}</div>
       </section>
-      <section class="home-memories"><div class="section-head"><h2>Memories</h2><div class="memory-nav"><a href="/compose" data-compose-open>Add memory</a>${link('/memories','See all')}</div></div>${collage(rows,next)}</section>
+      <section class="home-memories"><div class="section-head"><h2>Memories</h2><div class="memory-nav"><a href="/compose" data-compose-open>Add memory</a>${link('/memories','See all')}</div></div>${memoriesCompletionPrompt(collage(rows,next),unlock,me)}</section>
       ${page.composeDialog(key)}
     </div>`;
   },
-  memories(rows,next,q,key){return `<div class="memory-toolbar">
+  memories(rows,next,q,key,checks=[],me){return `<div class="memory-toolbar">
     <form method="get" action="/memories"><label><span class="memory-search-label">Search memories</span><input aria-label="Search memories" type="search" name="q" value="${e(q)}" placeholder="Search memories"></label><button>Search</button></form>
     <a href="/compose" class="profile-primary share-memory" data-compose-open>Add memory</a></div>
-    ${collage(rows,next,true)}
+    ${memoriesCompletionPrompt(collage(rows,next,true),checks,me)}
     ${page.composeDialog(key)}`;},
   gallery(photos){return `<div class="memory-nav">${link('/memories','Back to memories')}</div>${images(photos)}`;},
   memoryCards, memoryTags,
