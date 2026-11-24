@@ -715,13 +715,11 @@ p,dd,.memory-quote{text-wrap:pretty}
   .memory-toolbar .share-memory{display:inline-flex;align-items:center}
 }
 
-/* Owner edit mode */
-.edit-toggle{margin:0;min-height:42px;padding:.55rem 1rem;border-radius:var(--r-sm);background:var(--brick);color:var(--on-brick);font:600 .88rem var(--sans)}
-.edit-toggle[aria-pressed=true]{background:var(--paper);color:var(--brick);box-shadow:inset 0 0 0 1px var(--brick)}
-.alumni-profile[data-editable]:not(.is-editing) :is(.profile-identity,.profile-section:not(.profile-todo)) .inline-edit,
-.alumni-profile[data-editable]:not(.is-editing) [data-upload]{display:none}
-.alumni-profile.is-editing .profile-section:not(.profile-todo) .editable-field{background:var(--brick-wash);outline:1px dashed #b4583f80;outline-offset:4px;border-radius:var(--r-sm)}
-.alumni-profile.is-editing .inline-edit summary,.alumni-profile.is-editing [data-upload]{opacity:1}
+/* Owner editing controls are always visible. */
+.profile-actions a.edit-toggle{margin:0;min-height:44px;padding:.55rem 1rem;border-radius:var(--r-sm);background:var(--brick);color:var(--on-brick);font:600 .95rem var(--sans)}
+.alumni-profile .inline-edit summary,.alumni-profile [data-upload]{opacity:1}
+.alumni-profile .inline-edit summary{min-width:30px;min-height:32px;display:grid;place-items:center}
+.alumni-profile [data-upload]{min-width:40px;min-height:40px}
 
 /* Gallery: a real grid */
 .page-gallery .photos{grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:1rem}
