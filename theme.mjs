@@ -815,4 +815,11 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
 .unlock-checklist li{display:flex;align-items:center;gap:.5rem;font-size:1rem}
 .unlock-checklist small{margin-left:auto;font-size:.875rem}
 .alumni-home>.whatsapp-unlock{margin:1rem clamp(12px,4vw,52px)}
+
+.notification-accept{margin:0 .85rem .85rem;display:block}
+.notification-accept button,.meet-list .meet-form button{min-height:44px;font-size:.9rem}
+.meet-list li{border-radius:var(--r);flex-wrap:wrap}
+.meet-list .meet-form button{white-space:nowrap}
+.meet-status{color:var(--brick);font-weight:600;font-size:.95rem}
+.notification-card>.meet-status,.notification-card>.meet-hint{margin:0 .85rem .85rem}
 `;
