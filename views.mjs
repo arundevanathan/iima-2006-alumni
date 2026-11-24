@@ -109,9 +109,9 @@ export function render(title,body,member,{home=false,active=null}={}) {
   const menu=navigationLinks(current);
   const slug = current==='/' ? 'home' : current ? current.slice(1).replace(/\/$/,'')||'other' : 'other';
   const banded = ['memories','people','gallery'].includes(slug);
-  const footer = member ? `<footer class="site-footer"><div><div><p class="reunion-title" aria-label="${reunionTitle}">${titleCreative()}</p>
-    <p>IIM Ahmedabad · PGP 2004–06 · Twenty years on</p></div>
-    <nav aria-label="Footer">${link('/','Home')}${link('/memories','Memories')}${link('/people','Classmates')}${link('/reunion','Reunion')}${link('/wa/','WhatsApp')}${themeSwitch()}</nav></div></footer>` : '';
+  const footer = member ? `<footer class="site-footer"><div><div class="footer-brand"><p class="reunion-title" aria-label="${reunionTitle}">${titleCreative()}</p>
+    <p><span>IIM Ahmedabad · PGP 2004–06</span><span class="footer-tagline">Twenty years on</span></p></div>
+    <div class="footer-controls"><nav aria-label="Footer">${link('/','Home')}${link('/memories','Memories')}${link('/people','Classmates')}${link('/reunion','Reunion')}${link('/wa/','WhatsApp')}</nav>${themeSwitch('footer-theme')}</div></div></footer>` : '';
   const nav=member?`<nav aria-label="Main navigation"><details class="mobile-menu"><summary aria-label="Menu"><span class="menu-glyph" aria-hidden="true"></span></summary><div>${menu}</div></details><div class="desktop-menu">${menu}</div>
     <a class="notification-bell" href="/notifications" aria-label="Notifications${member.unread?' ('+member.unread+' unread)':''}">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
