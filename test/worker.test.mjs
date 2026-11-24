@@ -423,7 +423,8 @@ test('home and profiles still render before the catch-up migration is applied',a
 });
 
 test('WhatsApp pages: own page at 30+ messages, quiet ones to the batch story, data only for yourself',async()=>{
- const {call,session,env}=fixture();
+ const {call,session,env,sqlite}=fixture();
+ for(const member of [1,2])for(const [field,value] of Object.entries({city:'Mumbai',life:'My life',family:'My family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(member,field,value);
  const admin=await session(1,'aaaa'), classmate=await session(2,'bbbb');
  assert.match(await body(await call('/wa/',classmate)),/isn’t up yet/);
  const put=(key,value)=>env.MEDIA.put('whatsapp-v1/'+key,new TextEncoder().encode(typeof value==='string'?value:JSON.stringify(value)));
@@ -485,4 +486,31 @@ test('dark by default, light by choice, switch works without JavaScript',async()
  assert.match(toLight.headers.get('set-cookie'),/^theme=light;/);
  assert.match((await call('/theme',ck+'; theme=light',{},{Referer:'https://elsewhere.example/x'})).headers.get('set-cookie'),/^theme=dark;/);
  assert.equal((await call('/theme',ck,{},{Referer:'https://elsewhere.example/x'})).headers.get('location'),'/');
+});
+
+
+test('WhatsApp Insights require all five details and both photos on pages and APIs',async()=>{
+ const {call,session,sqlite}=fixture();
+ const ck=await session(2,'bbbb');
+ const prompt=await body(await call('/wa/',ck));
+ assert.match(prompt,/Complete your profile to unlock WhatsApp Insights/);
+ for(const label of ['Dorm number','Dorm name','Current city','Life, Lately','Family','Then photo (2006)','Now photo (2026)'])assert.ok(prompt.includes(label),label);
+ assert.match(await body(await call('/',ck)),/Complete your profile to unlock WhatsApp Insights/);
+ assert.match(await body(await call('/people/2',ck)),/data-unlock-edit/);
+ for(const path of ['/wa/','/wa/batch','/wa/story.html'])assert.match(await body(await call(path,ck)),/Complete your profile to unlock WhatsApp Insights/);
+ for(const path of ['/wa/api/me','/wa/api/group','/wa/api/me?person=P001']){
+  const response=await call(path,ck);assert.equal(response.status,403);assert.equal((await response.json()).error,'profile_incomplete');
+ }
+ for(const [field,value] of Object.entries({city:'Mumbai',life:'My life',family:'My family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,field,value);
+ assert.match(await body(await call('/wa/',ck)),/isn’t up yet/);
+ assert.match(await body(await call('/people/2',ck)),/Your WhatsApp Insights are unlocked/);
+ // Explicit owner blanks must override imported data and relock access immediately.
+ for(const field of ['dorm','nickname','city','life','family']){
+  sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,field,'   ');
+  assert.equal((await call('/wa/api/me',ck)).status,403,field);
+  sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,field,'Filled');
+ }
+ sqlite.prepare("DELETE FROM profile_fields WHERE member=2 AND field='nowPhotoObject'").run();
+ assert.equal((await call('/wa/api/group',ck)).status,403);
+ assert.match((await call('/wa/')).headers.get('location'),/^\/signin/);
 });
