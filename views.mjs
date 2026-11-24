@@ -19,8 +19,8 @@ const labelFor=key=>({dorm:'Dorm number',nickname:'Dorm name',city:'Current city
 const mediaSrc = (media,width) => `/media/${e(media)}?w=${width}`;
 const mediaSet = (media,widths) => widths.map(width=>`${mediaSrc(media,width)} ${width}w`).join(', ');
 const images=items=>items.length?`<div class="photos">${items.map(row=>`<figure><a href="/media/${e(row.media)}"><img src="${mediaSrc(row.media,256)}" srcset="${mediaSet(row.media,[256,480])}" sizes="(max-width: 520px) 45vw, 200px" loading="lazy" alt="${e(row.caption||'Batch photo')}"></a>${row.caption?`<figcaption>${e(row.caption)}</figcaption>`:''}</figure>`).join('')}</div>`:'<p>No published photos yet.</p>';
-const portrait=(person,lazy=true,width=96)=>person.portrait
-  ? `<img src="${mediaSrc(person.portrait,width)}" alt="" ${lazy?'loading="lazy"':''}>`
+const portrait=(person,lazy=true,width=96,sizes='')=>person.portrait
+  ? `<img src="${mediaSrc(person.portrait,width)}" ${sizes?`srcset="${mediaSet(person.portrait,[256,480,768])}" sizes="${sizes}"`: ''}alt="" ${lazy?'loading="lazy"':''}>`
   : `<span class="initials" aria-hidden="true">${e(person.name.trim().split(/\s+/).slice(0,2).map(word=>word[0]).join(''))}</span>`;
 const reunionTitle='Kal • Aaj • Aur Kal';
 const titleCreative=()=>`<span>Kal</span><span aria-hidden="true">•</span><span>Aaj</span><span aria-hidden="true">•</span><span>Aur Kal</span>`;
@@ -130,7 +130,7 @@ export function render(title,body,member,{home=false,active=null}={}) {
   .memory-nav{display:flex;flex-wrap:wrap;gap:.6rem 1.3rem;align-items:center;margin-bottom:1rem}.memory-feed{max-width:44rem}
   @media(max-width:600px){.directory-controls{grid-template-columns:1fr 1fr}.directory-controls label:first-child{grid-column:1/-1}}
   ${mobileNavCSS}
-  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=18" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=19" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
 }
 export function whatsappRequirements(details, photos={}) {
   return [['dorm','Dorm number'],['nickname','Dorm name'],['city','Current city'],['life','Life, Lately'],['family','Family']]
@@ -255,17 +255,10 @@ export const page={
         <strong>You’re confirmed for the reunion, ${e(member.name)}.</strong>
         ${party?`<p>${e(party)}</p>`:''}
         <div class="reunion-progress"><progress max="${critical}" value="${done}" aria-label="Reunion details complete">${done} of ${critical}</progress><span class="registry">${done} of ${critical} key details complete</span></div>
-        ${missingDetails?'<p class="reunion-missing">Your attendance details are missing some important information. Please help us complete this.</p>':''}<a href="#reunion-details">Review your reunion details</a>
+        ${missingDetails?'<p class="reunion-missing">Your attendance details are missing some important information. Please help us complete this.</p>':''}<a href="#reunion-details" data-reunion-details-open>Review your reunion details</a>
       </section>`:''}
-      <section class="reunion-section" id="reunion-agenda"><h2>Reunion agenda</h2>
-        <div class="reunion-days">${agenda.map(([date,theme,iso,rows,parallel])=>`<details>
-          <summary><time datetime="${iso}">${e(date)}</time><span>${e(theme)}</span></summary>
-          <ol class="reunion-timeline">${entries(rows)}</ol>
-          ${parallel.length?`<h3>Activities for families and alumni</h3><ol class="reunion-timeline">${entries(parallel)}</ol>`:''}
-        </details>`).join('')}</div>
-      </section>
       ${tracker?`<section class="reunion-section" id="reunion-details">
-        <h2>Your reunion details</h2>
+        <details class="reunion-details-panel"${missingDetails||showSaved?' open':''}><summary><h2>Your reunion details</h2><span>${missingDetails?missing.length+' details to complete':'Complete · review or edit'}</span></summary>
         ${missingDetails?'<p class="reunion-priority"><strong>Please complete the highlighted fields.</strong> The reunion team needs this information to plan for you and your guests.</p>':''}
         <p>Use the pencil next to a field to update it. Your responses are visible to you and the reunion admins.</p>
         ${showSaved&&saved?'<p class="reunion-saved" role="status">Your reunion details are saved.</p>':''}
@@ -285,12 +278,20 @@ export const page={
           row('arrivalTime','Arrival time',values.arrivalTime,null,'time')+
           row('departureDate','Departure date',values.departureDate,null,'date')+
           row('departureTime','Departure time',values.departureTime,null,'time'))}
+        </details>
       </section>`:''}
       <section class="reunion-section" id="reunion-attendees"><h2>Classmates attending</h2>${directory}</section>
+      <section class="reunion-section" id="reunion-agenda"><h2>Reunion agenda</h2>
+        <div class="reunion-days">${agenda.map(([date,theme,iso,rows,parallel])=>`<details>
+          <summary><time datetime="${iso}">${e(date)}</time><span>${e(theme)}</span></summary>
+          <ol class="reunion-timeline">${entries(rows)}</ol>
+          ${parallel.length?`<h3>Activities for families and alumni</h3><ol class="reunion-timeline">${entries(parallel)}</ol>`:''}
+        </details>`).join('')}</div>
+      </section>
     </div>`;
   },
   directory(rows,statuses,q,status,dorms,dorm,reunion=false,sections=[],section=''){return `<div class="classmates-directory"><form class="directory-controls" data-directory-filters method="get" action="${reunion?'/reunion#reunion-attendees':'/people'}">${input('q','Name, nickname or dorm',q)}${reunion?'':select('status','Attendance',[['','All classmates'],...Object.entries(statuses).filter(([,label])=>label)],status)}${dorms.length?select('dorm','Dorm',[['','All dorms'],...dorms.map(({dorm})=>[dorm,/^\d+$/.test(dorm)?'Dorm '+dorm:dorm])],dorm):''}${reunion?'':select('section','Section',[['','All sections'],...sections.map(({section})=>[section,section])],section)}<button>Search</button></form>
-    ${rows.length?`<p class="registry directory-count">${rows.length} ${reunion?'attending':rows.length===1?'classmate':'classmates'}</p><div class="directory-grid">${rows.map(row=>`<a class="directory-card" href="/people/${row.id}">${portrait(row,true,256)}<div>${classmate(row,reunion||!row.section?[]:['Section '+row.section])}${!reunion&&row.status==='attending'?`<small class="attend-yes">${e(statuses[row.status]||'Attending')}</small>`:''}</div></a>`).join('')}</div>`:status==='attending'?'<p>No classmates are marked as attending for these filters.</p>':'<p>No classmates match.</p>'}</div>`;},
+    ${rows.length?`<p class="registry directory-count">${rows.length} ${reunion?'attending':rows.length===1?'classmate':'classmates'}</p><div class="directory-grid">${rows.map(row=>`<a class="directory-card" href="/people/${row.id}">${portrait(row,true,256,'(max-width:650px) 42vw, 220px')}<div>${classmate(row,reunion||!row.section?[]:['Section '+row.section])}${!reunion&&row.status==='attending'?`<small class="attend-yes">${e(statuses[row.status]||'Attending')}</small>`:''}</div></a>`).join('')}</div>`:status==='attending'?'<p>No classmates are marked as attending for these filters.</p>':'<p>No classmates match.</p>'}</div>`;},
   person(row,status,details,photos,stories,me,pilot,composeKey,profilePhotos={},meet={available:false}){
     const own = me === row.id;
     const received = stories.filter(post=>post.author!==row.id);
