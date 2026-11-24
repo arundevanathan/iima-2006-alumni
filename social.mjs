@@ -18,12 +18,19 @@ export const socialScript = String.raw`
       }catch{const p=document.createElement('p');p.className='meet-hint';p.textContent='Search unavailable. Try again.';list.append(p);}
     },180);});
   }
-  // Owner editing controls stay visible, including without JavaScript.
+  // Completion links open and focus the exact required editor or photo control.
   const profile=document.querySelector('.alumni-profile');
   if(profile){
-    const startUnlockEdit=()=>{const todo=profile.querySelector('.profile-todo>details');if(todo)todo.open=true;};
-    if(new URLSearchParams(location.search).get('complete')==='whatsapp')startUnlockEdit();
-    profile.querySelector('[data-unlock-edit]')?.addEventListener('click',event=>{event.preventDefault();startUnlockEdit();const target=profile.querySelector('.profile-todo')||profile.querySelector('.profile-section');target?.scrollIntoView({block:'start',behavior:'smooth'});});
+    const jumpRequired=key=>{
+      let target=Array.from(profile.querySelectorAll('[data-required-field]')).find(node=>node.dataset.requiredField===key);
+      target ||= profile.querySelector('[data-required-missing]');if(!target)return;
+      for(let parent=target.parentElement;parent&&parent!==profile;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+      const editor=target.querySelector('.inline-edit');if(editor)editor.open=true;
+      target.scrollIntoView({block:'center',behavior:'smooth'});
+      const control=target.querySelector('textarea,input:not([type=hidden]):not([type=file]),button[data-upload]');control?.focus({preventScroll:true});
+    };
+    if(new URLSearchParams(location.search).get('complete')==='whatsapp')jumpRequired(location.hash.replace('#profile-field-',''));
+    profile.addEventListener('click',event=>{const link=event.target.closest('[data-required-jump]');if(!link)return;event.preventDefault();jumpRequired(link.dataset.requiredJump);});
   }
   const strip=document.querySelector('[data-classmate-strip]');
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
