@@ -838,4 +838,24 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
 .memories-gate-prompt .cta{margin-top:1rem;min-height:44px;text-decoration:none;font-size:1rem}
 @media(max-width:650px){.memories-gate-prompt{width:calc(100% - 24px);margin:18px 12px}.memories-gate-prompt .cta{display:flex;justify-content:center;width:100%}}
 @media print{.memories-gate-content{visibility:hidden}}
+
+.unlock-checklist li{align-items:center;gap:.45rem;padding:.35rem 0}
+.unlock-checklist .is-required a{color:var(--brick);font-weight:650;text-underline-offset:.2em}
+.unlock-checklist small{white-space:nowrap}
+.unlock-optional-note,.required-help{font-size:.95rem;color:var(--muted)}
+.profile-required-missing{background:var(--brick-wash);border:1px solid var(--brick-fired);border-radius:var(--r);padding:.8rem!important;scroll-margin:90px 0}
+.profile-required-missing .inline-edit summary{right:.35rem;top:.35rem;background:var(--paper);border-radius:var(--r)}
+.required-badge{display:inline-block;margin:.25rem .4rem;font:600 .8rem/1.3 var(--sans);letter-spacing:0;text-transform:none;color:var(--brick-deep);background:var(--tint);border:1px solid var(--brick-fired);padding:.2rem .4rem;border-radius:var(--r)}
+.profile-required-missing dt{padding-right:1.5rem}
+.profile-todo .profile-required-missing{margin-bottom:.65rem}
+.optional-profile-fields{margin-top:1rem}.optional-profile-fields>summary{font-size:.95rem;color:var(--muted)}
+.required-photo-button{padding:.55rem .75rem;min-height:44px;font-size:.95rem}
+.catchup-locked{padding:1rem;border:1px solid var(--line);border-radius:var(--r);background:var(--lime)}
+.catchup-locked p{margin:.4rem 0;font-size:1rem}
+.catchup-locked .cta{margin-top:.6rem;text-decoration:none;min-height:44px}
+.catchup-mask{display:flex;gap:1rem;overflow:hidden;filter:blur(7px);opacity:.6;pointer-events:none;user-select:none}
+.catchup-mask-person{display:flex;align-items:center;gap:.5rem;white-space:nowrap}
+.catchup-mask-person i{width:32px;height:32px;display:block;border-radius:50%;background:var(--brick)}
+.notification-locked-label{padding:.5rem .85rem 0;color:var(--muted);font-size:.9rem}
+.notification-card>.catchup-locked{margin:.65rem}
 `;
