@@ -426,14 +426,22 @@ export const socialScript = String.raw`
   document.addEventListener('submit',async event=>{
     const form=event.target;
     if(form.matches('form[action="/logout"]')){
+      event.preventDefault();
       const button=form.querySelector('button[type="submit"]');
-      if(button.disabled){event.preventDefault();return;}
-      button.textContent='Signing out…';
-      button.disabled=true;
-      window.addEventListener('pageshow',()=>{
-        button.textContent='Log out';
-        button.disabled=false;
-      },{once:true});
+      if(form.dataset.saving)return;
+      form.dataset.saving='true';button.textContent='Signing out…';button.disabled=true;
+      let status=form.querySelector('[data-logout-status]');
+      if(!status){status=document.createElement('p');status.dataset.logoutStatus='';status.setAttribute('role','alert');form.append(status);}
+      status.textContent='';
+      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
+      try{
+        const response=await fetch('/logout',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json'},signal:controller.signal});
+        if(!response.ok)throw new Error('Sign-out failed');
+        const result=await response.json();if(!result.signedOut)throw new Error('Sign-out not confirmed');
+        location.replace('/signin?signed-out=1');
+      }catch{
+        status.textContent='Could not finish signing out. Please try again.';
+      }finally{clearTimeout(timeout);delete form.dataset.saving;button.disabled=false;button.textContent='Log out';}
       return;
     }
     if(form.matches('[data-compose]')){
