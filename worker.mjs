@@ -236,6 +236,11 @@ async function route(req, env, record, setViewer) {
     return whatsappRequirements(details,Object.fromEntries(photos.map(photo=>[photo.slot,true])));
   }
   if (!post && (path==='/wa' || path.startsWith('/wa/'))) {
+    if (path==='/wa/' && u.searchParams.get('preview')==='locked') {
+      if (!admin) return new Response('Admin access required.',{status:403});
+      const checks=whatsappRequirements({},{});
+      return render('WhatsApp Insights',`<aside class="panel"><strong>Admin preview: locked WhatsApp Insights</strong><p>This simulates an incomplete profile. Your profile and access have not changed.</p><a href="/wa/">Exit preview</a></aside>`+whatsappUnlock(checks,me),member);
+    }
     const checks=await whatsappCompletion();
     if (checks.some(check=>!check.complete)) {
       if (path.startsWith('/wa/api/')) return new Response(JSON.stringify({error:'profile_incomplete',message:'Complete your profile to unlock WhatsApp Insights.',missing:checks.filter(check=>!check.complete).map(check=>check.label),profile:'/people/'+me+'?complete=whatsapp#whatsapp-unlock'}),{status:403,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});
