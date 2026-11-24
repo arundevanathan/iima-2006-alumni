@@ -810,4 +810,11 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
 :root[data-theme=dark] .initials{background:var(--brick-wash)!important}
 :root[data-theme=dark] .directory-card .initials,:root[data-theme=dark] .person-tile .initials{background:radial-gradient(circle at 50% 50%,var(--paper) 0 30%,var(--brick) calc(30% + 1px) calc(30% + 2px),var(--brick-wash) calc(30% + 3px))!important}
 :root[data-theme=dark] .site-footer{background-color:var(--night)}
+
+.whatsapp-unlock h2{font-size:clamp(1.35rem,4vw,1.8rem);margin:0 0 .6rem}
+.whatsapp-unlock{scroll-margin-top:80px}
+.unlock-checklist{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));gap:.45rem 1rem}
+.unlock-checklist li{display:flex;align-items:center;gap:.5rem;font-size:1rem}
+.unlock-checklist small{margin-left:auto;font-size:.875rem}
+.alumni-home>.whatsapp-unlock{margin:1rem clamp(12px,4vw,52px)}
 `;
