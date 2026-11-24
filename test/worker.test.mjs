@@ -726,3 +726,16 @@ test('logout client recovers after server failures and timeout, then navigates a
  assert.equal(button.disabled,false);assert.match(status.textContent,/try again/);
  context.fetch=async()=>({ok:true,json:async()=>({signedOut:true})});await handler();assert.equal(navigated,'/signin?signed-out=1');
 });
+
+
+test('reunion details collapse when complete and stay open when incomplete or just saved',async()=>{
+ const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
+ sqlite.exec("INSERT INTO reunion_tracker VALUES(2,'attending',0,0,1)");
+ let html=await body(await call('/reunion',ck));assert.match(html,/<details class="reunion-details-panel" open>/);
+ await call('/reunion',ck,{shirt:'M',spouse:'0',children:'0',bothNights:'1'});
+ html=await body(await call('/reunion',ck));assert.match(html,/<details class="reunion-details-panel">/);assert.doesNotMatch(html,/<details class="reunion-details-panel" open>/);
+ assert.ok(html.indexOf('id="reunion-attendees"')<html.indexOf('id="reunion-agenda"'));
+ assert.match(html,/data-reunion-details-open/);
+ html=await body(await call('/reunion?saved=1',ck));assert.match(html,/<details class="reunion-details-panel" open>/);
+ assert.match(html,/srcset="[^"]*w=480/);
+});
