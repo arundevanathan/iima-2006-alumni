@@ -43,3 +43,10 @@ Pages are dark unless the visitor chooses light. The choice is a `theme` cookie,
 - Confirm that a notification opens the relevant photo or comment, and that only admins can open the admin dashboard and exports.
 - Check the reunion form for a confirmed attendee and for an account without a confirmed RSVP.
 - Check Admin View coverage and the analytics dashboard. Email acceptance indicates that the provider accepted the send request. Verify inbox placement separately.
+
+
+## Catch-up requests and persistent notifications
+
+Apply `0015_catchup_notifications.sql` once, followed by `0016_notification_history.sql`, before deploying the catch-up acceptance UI. Migration 0015 preserves notification IDs and read flags while extending event kinds, adds stable request IDs and acceptance timestamps, and turns existing picks into notified requests. Database triggers enqueue one request alert and one acceptance alert per request, including for roster members who have not created an account. Only the recipient may accept an exact request ID. Retrying is idempotent; withdrawn requests cannot be accepted through old links. Read and withdrawn events remain in history.
+
+Migration 0016 backfills genuine historical likes, comments and mentions using the same deduplication keys as live events. It is safe to rerun; existing read flags remain unchanged. The actor of a historical tag edit is left unknown rather than attributed to the wrong person. Legacy events use the associated memory timestamp when their exact event time was not recorded. Signing in does not delete notifications or mark them read. The notification bell counts unread events; the inbox shows the latest 100 by timestamp with Accept request controls. Owners can also accept from Requests received on their profile. Catch-up request recipients now see the sender’s name; the previous anonymous-count behavior has been replaced.
