@@ -111,7 +111,7 @@ export function render(title,body,member,{home=false,active=null}={}) {
   const banded = ['memories','people','gallery'].includes(slug);
   const footer = member ? `<footer class="site-footer"><div><div class="footer-brand"><p class="reunion-title" aria-label="${reunionTitle}">${titleCreative()}</p>
     <p><span>IIM Ahmedabad · PGP 2004–06</span><span class="footer-tagline">Twenty years on</span></p></div>
-    <div class="footer-controls"><nav aria-label="Footer">${link('/','Home')}${link('/memories','Memories')}${link('/people','Classmates')}${link('/reunion','Reunion')}${link('/wa/','WhatsApp')}</nav>${themeSwitch('footer-theme')}</div></div></footer>` : '';
+    <div class="footer-controls">${themeSwitch('footer-theme')}</div></div></footer>` : '';
   const nav=member?`<nav aria-label="Main navigation"><details class="mobile-menu"><summary aria-label="Menu"><span class="menu-glyph" aria-hidden="true"></span></summary><div>${menu}</div></details><div class="desktop-menu">${menu}</div>
     <a class="notification-bell" href="/notifications" aria-label="Notifications${member.unread?' ('+member.unread+' unread)':''}">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
@@ -139,6 +139,11 @@ export function whatsappRequirements(details, photos={}) {
 }
 export function whatsappUnlock(checks, me, own=false) {
   const missing=checks.filter(check=>!check.complete), complete=!missing.length;
+  if(own)return `<section class="panel profile-completion-summary" id="whatsapp-unlock" aria-labelledby="profile-progress-title">
+    <div class="profile-progress-heading"><h2 id="profile-progress-title">${complete?'Profile complete':'Your profile'}</h2><strong>${checks.length-missing.length} of ${checks.length} complete</strong></div>
+    ${complete?'<p>Your WhatsApp Insights are unlocked.</p><a href="/wa/">View WhatsApp Insights</a>':`<progress max="${checks.length}" value="${checks.length-missing.length}" aria-label="Profile completion"></progress><p>Finish these items to unlock memories, WhatsApp Insights and incoming catch-up names.</p><ul class="profile-missing-items">${missing.map(check=>`<li><a href="#profile-field-${check.key}" data-required-jump="${check.key}">${e(check.label)}</a></li>`).join('')}</ul><a class="cta profile-primary" data-unlock-edit data-required-jump="${missing[0].key}" href="#profile-field-${missing[0].key}">Continue profile</a>`}
+    <details class="profile-all-requirements"><summary>All 7 requirements</summary><p>Only the five details and two photos below are required. Your profile picture and optional questions do not count.</p><ul class="unlock-checklist">${checks.map(check=>`<li><span aria-hidden="true">${check.complete?'✓':'○'}</span><span>${e(check.label)}</span><small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul></details>
+  </section>`;
   const target=key=>own?'#profile-field-'+key:'/people/'+me+'?complete=whatsapp#profile-field-'+key;
   return `<section class="panel whatsapp-unlock" id="whatsapp-unlock" aria-labelledby="whatsapp-unlock-title">
     <h2 id="whatsapp-unlock-title">${complete?'Your WhatsApp Insights are unlocked':own?'Complete these 7 items to unlock everything':'Complete your profile to unlock WhatsApp Insights'}</h2>
@@ -147,7 +152,8 @@ export function whatsappUnlock(checks, me, own=false) {
     <a class="cta profile-primary" ${own&&!complete?`data-unlock-edit data-required-jump="${missing[0].key}"`:''}href="${complete?'/wa/':target(missing[0].key)}">${complete?'View WhatsApp Insights':own?'Add next required item':'Complete my profile'}</a>
   </section>`;
 }
-export function catchupLocked(count,me) {
+export function catchupLocked(count,me,compact=false) {
+  if(compact)return `<div class="catchup-inline-mask"><div class="catchup-mask" inert aria-hidden="true"><span class="catchup-mask-person"><i></i><b>A classmate</b></span></div><p>Names unlock when your profile is complete. <a href="#whatsapp-unlock">View requirements</a></p></div>`;
   return `<div class="catchup-locked"><div class="catchup-mask" inert aria-hidden="true">${Array.from({length:Math.min(count,3)},()=>'<span class="catchup-mask-person"><i></i><b>A classmate</b></span>').join('')}</div><p><strong>${count} ${count===1?'classmate wants':'classmates want'} to catch up with you</strong></p><p>Complete your profile to see who and respond.</p><a class="cta profile-primary" href="/people/${me}?complete=whatsapp#whatsapp-unlock">Complete my profile</a></div>`;
 }
 export function memoriesCompletionPrompt(content,checks,me) {
@@ -202,7 +208,6 @@ export const page={
         <div class="meet-mine">${meet.picked.length?`<span class="meet-faces">${meetFaces(meet.picked)}</span><span class="registry">You’ve picked ${meet.picked.length}</span>`:'<span class="meet-hint">Send a catch-up request to the WIMWIans you want to meet in Jaipur. They’ll be notified and can accept it.</span>'}
           <a class="cta cta-primary" href="/people/${me}#meet">${meet.picked.length?'Add more':'Choose who to catch up with'}</a></div>
       </section>`:''}
-      ${unlock.length?whatsappUnlock(unlock,me):''}
       <section class="home-classmates"><div class="section-head"><h2>What are they up to?</h2>${link('/people','See all')}</div>
         <div class="people-grid" role="region" aria-label="What are they up to? Scroll to browse classmates" data-classmate-strip tabindex="0">${people.map(row=>`<a class="person-tile" href="/people/${row.id}">${portrait(row,true,256)}<div>${classmate(row)}</div></a>`).join('')}</div>
       </section>
@@ -319,7 +324,7 @@ export const page={
       const label = ({dorm:'Dorm number',nickname:'Dorm name'})[key] || labelFor(key);
       return `<div ${own?`id="profile-field-${key}" data-required-field="${key}" ${requiredKeys.has(key)&&!hasValue(key)?'data-required-missing':''}`:''} class="editable-field${key==='moment'?' entry-moment':''}${own&&requiredKeys.has(key)&&!hasValue(key)?' profile-required-missing':''}"><dt>${e(key==='city'?'Current city':label)}${requiredMark(key)}</dt><dd class="field-display">${details[key]?e(details[key]):'<span class="field-empty">Not added yet</span>'}</dd>${edit(key,label,details[key])}</div>`;
     };
-    return `<div class="alumni-profile">
+    return `<div class="alumni-profile${own?' is-owner':''}">
       <header class="profile-header">
         <div class="profile-cover"></div>
         <div class="profile-identity">
@@ -351,17 +356,17 @@ export const page={
       <div class="profile-layout${factKeys.length||photos.length||todoKeys.length?'':' profile-layout-wide'}">
         ${factKeys.length||photos.length||todoKeys.length?`<aside class="profile-sidebar">
           ${factKeys.length?`<section class="profile-section"><h2>About</h2><dl class="profile-facts">${factKeys.map(entry).join('')}</dl></section>`:''}
-          ${todoKeys.length?`<section class="profile-section profile-todo"><details${requiredTodo.length?' open':''}><summary><h2>${requiredTodo.length?'Required profile details':'More about you'}</h2><span class="registry">${requiredTodo.length} required · ${optionalTodo.length} optional</span></summary>
-            ${requiredTodo.length?`<p class="required-help">Complete the highlighted details below to unlock access. Add your Then and Now photos in the photo section.</p><dl class="profile-facts">${requiredTodo.map(entry).join('')}</dl>`:''}
-            ${optionalTodo.length?`<details class="optional-profile-fields"><summary>Optional details — not needed to unlock</summary><dl class="profile-facts">${optionalTodo.map(entry).join('')}</dl></details>`:''}</details></section>`:''}
+          ${todoKeys.length?`<section class="profile-section profile-todo${requiredTodo.length?' has-required':''}"><details${requiredTodo.length?' open':''}><summary><h2>${requiredTodo.length?'Required details':'Optional details'}</h2><span class="registry">${requiredTodo.length?requiredTodo.length+' to add':'Only if you’d like to share more'}</span></summary>
+            ${requiredTodo.length?`<dl class="profile-facts">${requiredTodo.map(entry).join('')}</dl>`:''}
+            ${optionalTodo.length?`<details class="optional-profile-fields"><summary>Optional details</summary><dl class="profile-facts">${optionalTodo.map(entry).join('')}</dl></details>`:''}</details></section>`:''}
           ${photos.length?`<section class="profile-section profile-photos"><div class="profile-section-head"><h2>Photos</h2>
             <a href="/gallery?person=${row.id}">View all</a></div>${images(photos.slice(0,4))}</section>`:''}
         </aside>`:''}
         <div class="profile-main">
           ${own&&meet.available?`<section class="profile-section profile-meet" id="meet"><h2>Looking to catch up</h2>
             <p class="meet-count">${meetCountLine(meet.count)}</p>
-            <p class="meet-hint">Send requests to classmates you want to catch up with in Jaipur. They’ll see your name and can accept. You’ll be notified when they accept.</p>
-            ${meet.incoming?.length&&!meet.unlocked?catchupLocked(meet.count,me):''}
+            <p class="meet-hint">Send a request to a classmate to arrange a catch-up.</p>
+            ${meet.incoming?.length&&!meet.unlocked?catchupLocked(meet.count,me,true):''}
             ${meet.unlocked&&meet.incoming?.length?`<h3>Requests received</h3><ul class="meet-list">${meet.incoming.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong><small>${person.accepted_at?'Accepted':'Wants to catch up with you'}</small></span></a>${person.accepted_at?'<span class="meet-status">Accepted</span>':meetForm('accept',person.id,'/people/'+me+'#meet','Accept request','',person.request_id)}</li>`).join('')}</ul>`:''}
             ${meet.picked.length?'<h3>Requests sent</h3>':''}
             ${meet.picked.length?`<ul class="meet-list">${meet.picked.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong><small>${person.accepted_at?'Accepted':'Awaiting response'}</small></span></a>${meetForm('remove',person.id,'/people/'+me+'#meet','Remove','meet-remove')}</li>`).join('')}</ul>`:''}
@@ -391,7 +396,7 @@ export const page={
       </div>
       ${memoryDialog()}
       ${own?'':page.composeDialog(composeKey,[{value:'person:'+row.id,label:row.name}])}
-      <div class="profile-report">${report('profile',row.id)}</div>
+      ${own?'':`<div class="profile-report">${report('profile',row.id)}</div>`}
     </div>`;
   },
   editProfile(fields,member,checks=[]){
