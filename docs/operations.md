@@ -77,3 +77,8 @@ Owner profiles use one compact completion summary with missing-item links and a 
 ## Sign-out behavior
 
 The server removes the session and expires the cookie. It returns a small confirmation to JavaScript clients or redirects for native form submissions; it does not request a browser-wide cache clear. The client waits up to eight seconds for confirmation, then replaces the page with the signed-out sign-in screen. A failed or timed-out request restores the Log out button and shows a retry message. Profile life text is visibly headed Life, Lately, matching the checklist and editor labels.
+
+
+## Reunion browsing
+
+Reunion attendees use two compact square-thumbnail cards per mobile row with responsive 256/480/768px image candidates. Personal reunion details are collapsed when the existing completeness rules are satisfied, and stay open when required details are missing or after a save. The review link and child/detail fragment links reopen the accordion. The attendee list precedes the agenda so completed attendees can browse classmates sooner.
