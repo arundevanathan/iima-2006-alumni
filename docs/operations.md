@@ -60,3 +60,10 @@ Migration 0016 backfills genuine historical likes, comments and mentions using t
 ## Memories completion prompt
 
 Home and Memories wrap the real memory feed in a blurred, inert preview until the same seven profile requirements as WhatsApp Insights are complete. The overlay shows completion progress, missing items and a Complete my profile action. This is deliberately a visual completion incentive: memory details, media, notifications and feed endpoints retain their existing signed-in access. The preview disables interaction and automatic infinite-feed loading within the blurred area. Completing the profile removes the treatment on the next page load. WhatsApp Insights retains its server-enforced completion requirement.
+
+
+## Completion focus and catch-up masking
+
+Incomplete profiles continue to show their incoming catch-up count and can send requests. Incoming request identities, photos and acceptance controls stay masked on profiles and in Notifications until all seven profile requirements are complete. Acceptance also checks completion on the server. Notifications remain stored and reveal normally after completion.
+
+On an owner profile, the checklist links target stable `profile-field-*` anchors. Clicking an Add link opens the enclosing details panels, opens the exact field editor and focuses its input; photo links focus the corresponding visible upload button. Missing required fields/photos have a Required to unlock badge, while optional missing details are grouped separately. Profile headshots, company, education and optional questions are explicitly excluded from the completion rule.
