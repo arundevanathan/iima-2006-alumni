@@ -698,3 +698,31 @@ test('profile has one completion summary and footer omits duplicate navigation',
  assert.match(html,/<nav class="app-bottom-nav"/);
  const home=await body(await call('/',ck));assert.equal((home.match(/>Complete my profile<\/a>/g)||[]).length,1);
 });
+
+
+test('logout supports a bounded client request with confirmed JSON and no cache-clearing stall',async()=>{
+ const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
+ const response=await call('/logout',ck,{}, {Accept:'application/json'});
+ assert.equal(response.status,200);assert.deepEqual(await response.json(),{signedOut:true});
+ assert.match(response.headers.get('set-cookie'),/Max-Age=0/);
+ assert.equal(response.headers.get('clear-site-data'),null);
+ assert.equal(sqlite.prepare('SELECT count(*) n FROM sessions').get().n,0);
+ const retry=await call('/logout',ck,{}, {Accept:'application/json'});assert.equal(retry.status,200);
+ assert.match(await body(await call('/people/2',await session(2,'cccc'))),/<h2 class="profile-lede-label">Life, Lately<\/h2>/);
+});
+
+
+test('logout client recovers after server failures and timeout, then navigates after confirmation',async()=>{
+ const {socialScript}=await import('../social.mjs');const {runInNewContext}=await import('node:vm');
+ const start=socialScript.indexOf(`    if(form.matches('form[action="/logout"]')){`),end=socialScript.indexOf(`    if(form.matches('[data-compose]'))`,start);
+ assert.ok(start>0&&end>start);
+ let timer,navigated,timeoutMs;const button={disabled:false,textContent:'Log out'},status={textContent:''};
+ const form={dataset:{},matches:()=>true,querySelector:s=>s.startsWith('button')?button:status};
+ const context={AbortController,setTimeout:(fn,ms)=>{timer=fn;timeoutMs=ms;return 1;},clearTimeout(){},location:{replace:url=>{navigated=url;}},fetch:async()=>({ok:false})};
+ const handler=()=>runInNewContext('(async(form,event)=>{'+socialScript.slice(start,end)+'})',context)(form,{preventDefault(){}});
+ await handler();assert.equal(button.disabled,false);assert.equal(button.textContent,'Log out');assert.match(status.textContent,/try again/);assert.equal(navigated,undefined);
+ context.fetch=(_,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new Error('aborted'))));
+ const stalled=handler();assert.equal(button.disabled,true);assert.equal(timeoutMs,8000);timer();await stalled;
+ assert.equal(button.disabled,false);assert.match(status.textContent,/try again/);
+ context.fetch=async()=>({ok:true,json:async()=>({signedOut:true})});await handler();assert.equal(navigated,'/signin?signed-out=1');
+});
