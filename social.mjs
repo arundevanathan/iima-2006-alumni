@@ -32,6 +32,11 @@ export const socialScript = String.raw`
     if(new URLSearchParams(location.search).get('complete')==='whatsapp')jumpRequired(location.hash.replace('#profile-field-',''));
     profile.addEventListener('click',event=>{const link=event.target.closest('[data-required-jump]');if(!link)return;event.preventDefault();jumpRequired(link.dataset.requiredJump);});
   }
+  const reunionDetails=document.querySelector('.reunion-details-panel');
+  if(reunionDetails){
+    if(location.hash.startsWith('#reunion-details')||location.hash.startsWith('#reunion-children'))reunionDetails.open=true;
+    document.querySelector('[data-reunion-details-open]')?.addEventListener('click',()=>{reunionDetails.open=true;});
+  }
   const strip=document.querySelector('[data-classmate-strip]');
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
   if(strip && !reducedMotion.matches){
