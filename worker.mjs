@@ -310,7 +310,7 @@ async function route(req, env, record, setViewer) {
       WHERE p.id=? AND ${postVisible} ORDER BY ph.object_key LIMIT 1 OFFSET ?`,bits[1],Number(bits[2])-1);
     return servePhoto(env,row,req);
   }
-  const notificationVisible=`(n.sample=1 OR (p.id IS NOT NULL AND ${postVisible}
+  const notificationVisible=`(n.sample=1 OR n.kind IN ('catchup_request','catchup_accepted') OR (p.id IS NOT NULL AND ${postVisible}
     AND (n.kind<>'comment' OR EXISTS(SELECT 1 FROM comments c WHERE 'comment-'||c.id=n.anchor AND c.post=p.id AND c.hidden=0))))`;
   const notificationFrom='FROM notifications n LEFT JOIN posts p ON p.id=n.post';
   if (!post && u.searchParams.get('fragment')!=='1') {
@@ -365,13 +365,15 @@ async function route(req, env, record, setViewer) {
   const meetLimit = 60;
   async function meetSummary(target=null) {
     try {
-      const [count,picked,wanted] = await Promise.all([
+      const [count,picked,wanted,incoming] = await Promise.all([
         one('SELECT count(*) AS n FROM meet_wishes WHERE target=?',me),
-        all(`SELECT r.id,r.name,r.nickname,r.dorm,${portrait} AS portrait FROM meet_wishes w JOIN roster r ON r.id=w.target ${seedJoin}
+        all(`SELECT r.id,r.name,r.nickname,r.dorm,w.request_id,w.accepted_at,${portrait} AS portrait FROM meet_wishes w JOIN roster r ON r.id=w.target ${seedJoin}
           WHERE w.member=? ORDER BY w.created DESC,r.name`,+pilot,me),
-        target==null ? null : one('SELECT 1 AS yes FROM meet_wishes WHERE member=? AND target=?',me,target)
+        target==null ? null : one('SELECT request_id,accepted_at FROM meet_wishes WHERE member=? AND target=?',me,target),
+        all(`SELECT r.id,r.name,r.nickname,w.request_id,w.accepted_at,${portrait} AS portrait FROM meet_wishes w JOIN roster r ON r.id=w.member ${seedJoin}
+          WHERE w.target=? ORDER BY w.created DESC,r.name`,+pilot,me)
       ]);
-      return {available:true,count:count.n,picked,wanted:!!wanted};
+      return {available:true,count:count.n,picked,wanted:!!wanted,accepted:!!wanted?.accepted_at,incoming};
     } catch { return {available:false,count:0,picked:[],wanted:false}; }
   }
   if (path==='/meet' && post) {
@@ -379,9 +381,19 @@ async function route(req, env, record, setViewer) {
     const target = Number(str(f,'target',12));
     const action = str(f,'action',10);
     const back = destination(str(f,'next',300)||'/people/'+me);
-    if (!['add','remove'].includes(action) || !Number.isInteger(target) || target===me || !(await one('SELECT id FROM roster WHERE id=?',target)))
+    if (!['add','remove','accept'].includes(action) || !Number.isInteger(target) || target===me || !(await one('SELECT id FROM roster WHERE id=?',target)))
       return invalid('Choose a classmate.');
+    if (action==='accept') {
+      const request=str(f,'request',80);
+      const wish=await one('SELECT request_id FROM meet_wishes WHERE member=? AND target=? AND request_id=?',target,me,request);
+      if (!wish) return missing();
+      // Only the recipient may accept this exact request; a retry never sends a second event.
+      await run('UPDATE meet_wishes SET accepted_at=? WHERE member=? AND target=? AND request_id=? AND accepted_at IS NULL',now(),target,me,request);
+      return redirect(back);
+    }
     if (action==='add') {
+      const existing=await one('SELECT 1 AS yes FROM meet_wishes WHERE member=? AND target=?',me,target);
+      if (existing) return redirect(back);
       const {n} = await one('SELECT count(*) AS n FROM meet_wishes WHERE member=?',me);
       if (n>=meetLimit) return invalid('You can pick up to '+meetLimit+' classmates.');
       await run('INSERT OR IGNORE INTO meet_wishes(member,target,created) VALUES(?,?,?)',me,target,now());
@@ -753,13 +765,16 @@ async function route(req, env, record, setViewer) {
     }
     const opened=Number(u.searchParams.get('open'));
     if(Number.isSafeInteger(opened)&&opened>0){
-      const item=await one(`SELECT n.id,n.post,n.anchor ${notificationFrom}
+      const item=await one(`SELECT n.id,n.post,n.anchor,n.kind,n.actor ${notificationFrom}
         WHERE n.id=? AND n.recipient=? AND ${notificationVisible}`,opened,me);
       if(!item)return missing();
       await run('UPDATE notifications SET is_read=1 WHERE id=? AND recipient=?',opened,me);
+      if (item.kind==='catchup_request') return redirect('/people/'+me+'#meet');
+      if (item.kind==='catchup_accepted') return redirect('/people/'+item.actor);
       return redirect(item.post?'/posts/'+encode(item.post)+(item.anchor?'#'+encode(item.anchor):''):path);
     }
     const rows=await all(`SELECT n.*,r.name AS actor_name,${portrait} AS actor_portrait,
+      w.request_id AS meet_request,w.accepted_at AS meet_accepted,
       p.body AS memory_text,a.title AS album_title,c.body AS comment_text,
       CASE
         WHEN n.anchor LIKE 'photo-post-%' THEN 'post/'||substr(n.anchor,12)
@@ -769,12 +784,13 @@ async function route(req, env, record, setViewer) {
           (SELECT 'post/'||u.id FROM uploads u WHERE u.post=p.id ORDER BY u.id LIMIT 1)
         WHEN EXISTS(SELECT 1 FROM photos ph WHERE ph.submission=p.origin) THEN 'legacy/'||p.id||'/1'
       END AS preview_media
-      ${notificationFrom} LEFT JOIN roster r ON r.id=n.actor ${seedJoin}
+      ${notificationFrom} LEFT JOIN meet_wishes w ON w.request_id=n.anchor AND n.kind IN ('catchup_request','catchup_accepted')
+      LEFT JOIN roster r ON r.id=n.actor ${seedJoin}
       LEFT JOIN memory_albums a ON a.post=p.id
       LEFT JOIN comments c ON n.kind='comment' AND c.id=substr(n.anchor,9) AND c.post=p.id AND c.hidden=0
       WHERE n.recipient=? AND ${notificationVisible}
-      ORDER BY n.id DESC LIMIT 100`,+pilot,me);
-    return show('Notifications',page.notifications(rows));
+      ORDER BY n.created DESC,n.id DESC LIMIT 100`,+pilot,me);
+    return show('Notifications',page.notifications(rows,me));
   }
   if (path==='/admin/analytics' && admin && !post) {
     const days=u.searchParams.get('days')==='90'?90:30;
