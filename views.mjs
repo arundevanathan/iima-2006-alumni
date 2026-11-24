@@ -130,7 +130,7 @@ export function render(title,body,member,{home=false,active=null}={}) {
   .memory-nav{display:flex;flex-wrap:wrap;gap:.6rem 1.3rem;align-items:center;margin-bottom:1rem}.memory-feed{max-width:44rem}
   @media(max-width:600px){.directory-controls{grid-template-columns:1fr 1fr}.directory-controls label:first-child{grid-column:1/-1}}
   ${mobileNavCSS}
-  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=17" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+  </style><body class="${home?'home ':''}${member?'member-site has-mobile-nav ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?mobileNavigation(current):''}${member?'<script src="/social.js?v=18" defer></script>':''}</body></html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
 }
 export function whatsappRequirements(details, photos={}) {
   return [['dorm','Dorm number'],['nickname','Dorm name'],['city','Current city'],['life','Life, Lately'],['family','Family']]
@@ -335,7 +335,7 @@ export const page={
           <div class="profile-name editable-field"><h1 class="field-display">${e(details.displayName||row.name)}</h1>
             ${hasValue('nickname')?`<p class="nickname">“${e(details.nickname)}”</p>`:''}
             ${(()=>{const reg=[hasValue('section')&&'Section '+details.section,hasValue('dorm')&&dormLabel(details.dorm.trim()),'PGP 2004–06'].filter(Boolean).join(' · ');return `<p class="registry profile-registry">${e(reg)}</p>`;})()}
-            ${hasValue('life')?`<div id="profile-field-life" data-required-field="life" class="editable-field profile-lede-field"><p class="profile-lede field-display">${e(details.life)}</p>${edit('life',labelFor('life'),details.life)}</div>`:''}
+            ${hasValue('life')?`<div id="profile-field-life" data-required-field="life" class="editable-field profile-lede-field"><h2 class="profile-lede-label">Life, Lately</h2><p class="profile-lede field-display">${e(details.life)}</p>${edit('life',labelFor('life'),details.life)}</div>`:''}
             ${edit('displayName','Name',details.displayName||row.name)}
             <div class="editable-field profile-rsvp">
               ${status?`<span class="profile-status field-display">${e(status)}</span>`:''}
