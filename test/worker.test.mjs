@@ -398,7 +398,7 @@ test('WIMWIans send catch-up requests visible only to the recipient',async()=>{
  const adminOwn=meetSection(await body(await call('/people/1',admin)));
  assert.match(adminOwn,/WIMWIan is looking to catch up with you/);
  assert.doesNotMatch(adminOwn,/Test Classmate/);
- assert.match(adminOwn,/Complete your profile to see who and respond/);
+ assert.match(adminOwn,/Names unlock when your profile is complete/);
  assert.match(await body(await call('/people/1',classmate)),/Request sent/);
  assert.match(meetSection(await body(await call('/people/2',classmate))),/href="\/people\/1"[\s\S]*Test Admin/);
  assert.match(banner(await body(await call('/',classmate))),/You’ve picked 1/);
@@ -496,7 +496,7 @@ test('WhatsApp Insights require all five details and both photos on pages and AP
  const prompt=await body(await call('/wa/',ck));
  assert.match(prompt,/Complete your profile to unlock WhatsApp Insights/);
  for(const label of ['Dorm number','Dorm name','Current city','Life, Lately','Family','Then photo (2006)','Now photo (2026)'])assert.ok(prompt.includes(label),label);
- assert.match(await body(await call('/',ck)),/Complete your profile to unlock WhatsApp Insights/);
+ assert.match(await body(await call('/',ck)),/Complete your profile to access memories/);
  assert.match(await body(await call('/people/2',ck)),/data-unlock-edit/);
  for(const path of ['/wa/','/wa/batch','/wa/story.html'])assert.match(await body(await call(path,ck)),/Complete your profile to unlock WhatsApp Insights/);
  for(const path of ['/wa/api/me','/wa/api/group','/wa/api/me?person=P001']){
@@ -669,7 +669,7 @@ test('Home and Memories blur the real feed until the shared profile requirements
 test('required profile checklist links identify and highlight exactly the missing editors and photos',async()=>{
  const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
  const html=await body(await call('/people/2',ck));
- assert.match(html,/Complete these 7 items to unlock everything/);
+ assert.match(html,/class="panel profile-completion-summary"/);
  assert.match(html,/Only the five details and two photos below are required/);
  for(const key of ['city','family','then','now']){
   assert.ok(html.includes('href="#profile-field-'+key+'"'),key+' checklist link');
@@ -678,7 +678,23 @@ test('required profile checklist links identify and highlight exactly the missin
  assert.match(html,/data-required-jump="city"/);
  const full=await body(await call('/profile',ck));assert.match(full,/5 required profile details/);assert.match(full,/2 required photos/);assert.match(full,/Optional career details/);
  assert.match(html,/Required to unlock/);
- assert.match(html,/Optional details — not needed to unlock/);
+ assert.match(html,/Optional details/);
  assert.match(html,/Add Then photo/);assert.match(html,/Add Now photo/);
  const other=await body(await call('/people/1',ck));assert.doesNotMatch(other,/Required to unlock|data-required-jump/);
+});
+
+
+test('profile has one completion summary and footer omits duplicate navigation',async()=>{
+ const {call,session}=fixture();const ck=await session(2,'bbbb');
+ await call('/meet',ck,{action:'add',target:'1'});
+ const recipient=await session(1,'aaaa');
+ const html=await body(await call('/people/1',recipient));
+ assert.equal((html.match(/class="panel profile-completion-summary"/g)||[]).length,1);
+ assert.equal((html.match(/>Continue profile<\/a>/g)||[]).length,1);
+ assert.doesNotMatch(html,/>Complete my profile<\/a>/);
+ const footer=html.match(/<footer class="site-footer">[\s\S]*?<\/footer>/)[0];
+ assert.doesNotMatch(footer,/<nav|href="\/memories"/);
+ assert.match(footer,/footer-theme/);
+ assert.match(html,/<nav class="app-bottom-nav"/);
+ const home=await body(await call('/',ck));assert.equal((home.match(/>Complete my profile<\/a>/g)||[]).length,1);
 });
