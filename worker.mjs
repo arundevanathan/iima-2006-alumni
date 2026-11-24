@@ -1,4 +1,4 @@
-import { render, signIn, page, form, field, escape } from './views.mjs';
+import { render, signIn, page, form, field, escape, whatsappRequirements, whatsappUnlock } from './views.mjs';
 import { fonts } from './fonts.mjs';
 import { whatsappRoute } from './whatsapp.mjs';
 
@@ -221,7 +221,27 @@ async function route(req, env, record, setViewer) {
       instr(lower(name||' '||nickname),lower(?))>0 ORDER BY name LIMIT 12`,me,q));
   }
   const admin = member.role === 'admin';
+  async function whatsappCompletion() {
+    const [roster, selected, photos] = await Promise.all([
+      one('SELECT dorm,nickname FROM roster WHERE id=?',me),
+      all('SELECT field,value FROM selected_profile_fields WHERE member=? AND pilot_only<=? ORDER BY priority',me,+pilot),
+      all(`SELECT ph.slot FROM yearbook_public y,json_each(y.images) j
+        JOIN photos ph ON ph.submission=json_extract(j.value,'$.submission') AND ph.object_key=json_extract(j.value,'$.key')
+        WHERE y.member=? AND ph.slot IN ('then','now')
+        UNION ALL SELECT CASE field WHEN 'thenPhotoObject' THEN 'then' ELSE 'now' END AS slot
+        FROM profile_fields WHERE member=? AND field IN ('thenPhotoObject','nowPhotoObject') AND trim(value)<>''`,me,me)
+    ]);
+    const details={...roster};
+    for (const item of selected) details[item.field]=item.value;
+    return whatsappRequirements(details,Object.fromEntries(photos.map(photo=>[photo.slot,true])));
+  }
   if (!post && (path==='/wa' || path.startsWith('/wa/'))) {
+    const checks=await whatsappCompletion();
+    if (checks.some(check=>!check.complete)) {
+      if (path.startsWith('/wa/api/')) return new Response(JSON.stringify({error:'profile_incomplete',message:'Complete your profile to unlock WhatsApp Insights.',missing:checks.filter(check=>!check.complete).map(check=>check.label),profile:'/people/'+me+'?complete=whatsapp#whatsapp-unlock'}),{status:403,headers:{'Content-Type':'application/json','Cache-Control':'private, no-store'}});
+      return render('WhatsApp Insights',whatsappUnlock(checks,me),member);
+    }
+
     const response = await whatsappRoute({path,u,req,env,member,admin,all,one,render});
     if (response) return response;
   }
@@ -385,10 +405,10 @@ async function route(req, env, record, setViewer) {
     return json([...people,...topics,...suggestions.filter(x=>!topics.some(t=>t.label.toLowerCase()===x.label.toLowerCase()))]);
   }
   if (path==='/') {
-    const [{rows,next},people,meet] = await Promise.all([feed(9,true),all(`SELECT r.id,r.name,r.dorm,r.nickname,${portrait} AS portrait FROM roster r ${seedJoin}
+    const [{rows,next},people,meet,unlock] = await Promise.all([feed(9,true),all(`SELECT r.id,r.name,r.dorm,r.nickname,${portrait} AS portrait FROM roster r ${seedJoin}
       WHERE EXISTS(SELECT 1 FROM submissions y WHERE y.subject=r.id AND y.contributor=r.id AND y.kind='self')
-      ORDER BY random() LIMIT 12`,+pilot),meetSummary()]);
-    return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet),member,{home:true});
+      ORDER BY random() LIMIT 12`,+pilot),meetSummary(),whatsappCompletion()]);
+    return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet,unlock),member,{home:true});
   }
   if (path==='/people' || path==='/reunion') {
   const completeness = `(2 * EXISTS(SELECT 1 FROM yearbook_public y WHERE y.member=r.id AND (y.fields<>'{}' OR y.images<>'[]'))
