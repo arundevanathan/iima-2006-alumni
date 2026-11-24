@@ -18,6 +18,8 @@ New local databases can apply the checked-in migrations in order. Existing envir
 
 ## WhatsApp story
 
+WhatsApp Insights require a signed-in member with all seven profile requirements complete: dorm number, dorm name, current city, Life, Lately, family, a Then photo and a Now photo. Home, the owner profile and the locked Insights page show a checklist. Both story pages and all `/wa/api/` endpoints enforce this on the server; no admin bypass is applied. Existing published profile values and Then/Now photos count; explicit blank owner text values override imported values. Optional prompts are not required.
+
 `/wa/` shows each signed-in classmate their own WhatsApp story. `/wa/batch` is the batch story. It is not in any menu; personal pages link to it. Both come from the batch WhatsApp pipeline's microsite kit, which holds every batchmate's personal data. The kit lives only in R2 under `whatsapp-v1/` and must never be committed. Load or refresh it from an unzipped kit:
 
 ```sh
