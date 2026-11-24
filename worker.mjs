@@ -493,8 +493,12 @@ async function route(req, env, record, setViewer) {
 
   if (path==='/profile') {
     if (!post) {
-      const fields = await all('SELECT field,value FROM profile_fields WHERE member=?',me);
-      return show('Edit profile',page.editProfile(Object.fromEntries(fields.map(f=>[f.field,f.value])),member));
+      const [roster,fields]=await Promise.all([
+        one('SELECT dorm,nickname FROM roster WHERE id=?',me),
+        all('SELECT field,value FROM selected_profile_fields WHERE member=? AND pilot_only<=? ORDER BY priority',me,+pilot)
+      ]);
+      const values={...roster};for(const item of fields)values[item.field]=item.value;
+      return show('Edit profile',page.editProfile(values,member));
     }
     const f = await data();
     const inline = f.get('field');
