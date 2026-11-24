@@ -38,14 +38,14 @@ const classmate = (row,extra=[]) => {
   const registry = [row.dorm&&dormLabel(row.dorm),...extra].filter(Boolean).join(' · ');
   return `<strong>${e(row.name)}</strong>${row.nickname?`<small class="nickname">“${e(row.nickname)}”</small>`:''}${registry?`<small class="registry">${e(registry)}</small>`:''}`;
 };
-// "Looking to catch up": a count for the target, a private list for the picker.
+// Catch-up requests reveal the sender to the recipient and can be accepted.
 const checkIcon = '<svg class="icon-inline" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6"/></svg>', extIcon = '<svg class="icon-inline icon-ext" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
 export const themeSwitch = (cls='') => `<form method="post" action="/theme" class="theme-switch ${cls}"><button type="submit" aria-label="Switch between dark and light mode"><span class="to-light">☀ Light mode</span><span class="to-dark">☾ Dark mode</span></button></form>`;
 const plural = (n,one,many) => n===1 ? one : many;
 const meetCountLine = count => count>0
   ? `<strong class="meet-number">${count}</strong> <span>${plural(count,'WIMWIan is','WIMWIans are')} looking to catch up with you</span>`
   : '<span>Which WIMWIans are you looking to catch up with?</span>';
-const meetForm = (action,target,next,label,cls='') => `<form method="post" action="/meet" class="meet-form ${cls}">${field('action',action)}${field('target',target)}${field('next',next)}<button type="submit">${label}</button></form>`;
+const meetForm = (action,target,next,label,cls='',request='') => `<form method="post" action="/meet" class="meet-form ${cls}">${field('action',action)}${field('target',target)}${field('next',next)}${request?field('request',request):''}<button type="submit">${label}</button></form>`;
 const meetFaces = people => people.slice(0,6).map(person=>`<a class="meet-face" href="/people/${person.id}" title="${e(person.name)}">${portrait(person,true,96)}</a>`).join('');
 // Days until the reunion opens in Jaipur (IST); a seal counts down on Home and Reunion.
 const reunionStart = Date.parse('2026-12-26T00:00:00+05:30');
@@ -177,7 +177,7 @@ export const page={
       </div>${countdown()?`<a class="seal-link" href="/reunion">${countdown()}</a>`:''}</section>
       ${meet.available?`<section class="meet-banner" aria-label="Looking to catch up">
         <p class="meet-count">${meetCountLine(meet.count)}</p>
-        <div class="meet-mine">${meet.picked.length?`<span class="meet-faces">${meetFaces(meet.picked)}</span><span class="registry">You’ve picked ${meet.picked.length}</span>`:'<span class="meet-hint">Pick the WIMWIans you most want to catch up with in Jaipur. Only you see your list.</span>'}
+        <div class="meet-mine">${meet.picked.length?`<span class="meet-faces">${meetFaces(meet.picked)}</span><span class="registry">You’ve picked ${meet.picked.length}</span>`:'<span class="meet-hint">Send a catch-up request to the WIMWIans you want to meet in Jaipur. They’ll be notified and can accept it.</span>'}
           <a class="cta cta-primary" href="/people/${me}#meet">${meet.picked.length?'Add more':'Choose who to catch up with'}</a></div>
       </section>`:''}
       ${unlock.length?whatsappUnlock(unlock,me):''}
@@ -315,8 +315,8 @@ export const page={
           <div class="profile-actions">
             ${own?'<a class="edit-toggle" href="/profile">Edit profile</a>':''}
             ${!own&&meet.available?(meet.wanted
-              ? meetForm('remove',row.id,'/people/'+row.id,checkIcon+'On your catch-up list','is-on')
-              : meetForm('add',row.id,'/people/'+row.id,'I’d like to catch up with '+e((details.displayName||row.name).split(/\s+/)[0]))):''}
+              ? meetForm('remove',row.id,'/people/'+row.id,checkIcon+(meet.accepted?'Catch-up accepted':'Request sent'),'is-on')
+              : meetForm('add',row.id,'/people/'+row.id,'Ask to catch up with '+e((details.displayName||row.name).split(/\s+/)[0]))):''}
             ${linkedin}
           </div>
         </div>
@@ -334,13 +334,15 @@ export const page={
         <div class="profile-main">
           ${own&&meet.available?`<section class="profile-section profile-meet" id="meet"><h2>Looking to catch up</h2>
             <p class="meet-count">${meetCountLine(meet.count)}</p>
-            <p class="meet-hint">Pick the WIMWIans you most want to catch up with in Jaipur. Only you can see this list; each of them sees how many WIMWIans are looking to catch up with them, never who.</p>
-            ${meet.picked.length?`<ul class="meet-list">${meet.picked.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong>${person.nickname?`<small class="nickname">“${e(person.nickname)}”</small>`:''}</span></a>${meetForm('remove',person.id,'/people/'+me+'#meet','Remove','meet-remove')}</li>`).join('')}</ul>`:''}
+            <p class="meet-hint">Send requests to classmates you want to catch up with in Jaipur. They’ll see your name and can accept. You’ll be notified when they accept.</p>
+            ${meet.incoming?.length?`<h3>Requests received</h3><ul class="meet-list">${meet.incoming.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong><small>${person.accepted_at?'Accepted':'Wants to catch up with you'}</small></span></a>${person.accepted_at?'<span class="meet-status">Accepted</span>':meetForm('accept',person.id,'/people/'+me+'#meet','Accept request','',person.request_id)}</li>`).join('')}</ul>`:''}
+            ${meet.picked.length?'<h3>Requests sent</h3>':''}
+            ${meet.picked.length?`<ul class="meet-list">${meet.picked.map(person=>`<li><a href="/people/${person.id}">${portrait(person,true,96)}<span><strong>${e(person.name)}</strong><small>${person.accepted_at?'Accepted':'Awaiting response'}</small></span></a>${meetForm('remove',person.id,'/people/'+me+'#meet','Remove','meet-remove')}</li>`).join('')}</ul>`:''}
             <div class="meet-search" data-meet-picker data-picked="${meet.picked.map(person=>person.id).join(',')}">
               <label>Add a WIMWIan<input type="search" data-meet-search placeholder="Type a name or nickname" autocomplete="off"></label>
               <div data-meet-results role="listbox" aria-label="Matching classmates"></div>
               <form method="post" action="/meet" data-meet-add hidden>${field('action','add')}<input type="hidden" name="target" value="">${field('next','/people/'+me+'#meet')}</form>
-              <noscript><p class="meet-hint">Or open any WIMWIan’s profile and press “I’d like to catch up”.</p></noscript>
+              <noscript><p class="meet-hint">Or open any WIMWIan’s profile and press “Ask to catch up”.</p></noscript>
             </div></section>`:''}
           ${own||Object.keys(profilePhotos).length?`<section class="profile-section profile-then-now"><h2>Then / Now</h2>
             <div class="then-now-grid">${['then','now'].map(slot=>{
@@ -403,13 +405,15 @@ export const page={
       `<details class="comment-menu"><summary aria-label="Comment options">⋯</summary><div>${action(url,'delete-comment','Delete comment',{comment:c.id})}</div></details><details><summary>Edit comment</summary>${form(url,field('action','edit-comment')+field('comment',c.id)+input('body','Comment',c.body,'required'),'Save')}</details>`:''}${report('comment',c.id)}<p class="story">${e(c.body)}</p></div>`),'No comments yet.')+
       (()=>{const composer=form(url,field('action','comment')+area('body','Add a comment','','required maxlength="1200"'),'Post comment');return commentPosted?`<details><summary>Add another comment</summary>${composer}</details>`:composer;})();
   },
-  notifications(rows){
-    const labels={mention:'mentioned you',like:'liked your memory',comment:'commented on your memory',tag:'added a tag to your memory'};
+  notifications(rows,me){
+    const labels={mention:'mentioned you',like:'liked your memory',comment:'commented on your memory',tag:'added a tag to your memory',catchup_request:'wants to catch up with you',catchup_accepted:'accepted your catch-up request'};
     const dates=new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Kolkata'});
     return `<div class="notification-actions">${rows.some(n=>!n.is_read)?form('/notifications',field('action','read-all'),'Mark all read'):''}
       ${rows.some(n=>n.sample)?form('/notifications',field('action','clear-samples'),'Remove test notifications'):''}</div>
       ${rows.length?`<section aria-label="Recent activity" class="notification-feed">${rows.map(n=>{
         const url='/notifications?open='+n.id;
+        const catchup=n.kind==='catchup_request'||n.kind==='catchup_accepted';
+        const requestAction=n.kind==='catchup_request'?(n.meet_request?(n.meet_accepted?'<p class="meet-status">You accepted this request.</p>':meetForm('accept',n.actor,'/notifications','Accept request','notification-accept',n.meet_request)):'<p class="meet-hint">This request is no longer active.</p>'):'';
         const body=['Shared a yearbook photo.','Shared a photo.'].includes(n.memory_text)?'':n.memory_text;
         const photo=n.anchor.startsWith('photo-');
         const summary=n.comment_text||body;
@@ -423,9 +427,10 @@ export const page={
             <div><strong>${labels[n.kind]}${photo?' on a photo':''}</strong>
               ${n.album_title?`<span class="notification-album">${e(n.album_title)}</span>`:''}
               ${summary?`<p>${e(summary.slice(0,240))}${summary.length>240?'…':''}</p>`:''}
-              <span class="notification-open">${n.kind==='comment'&&!n.sample?'View comment':photo?'View photo':n.post?'Open memory':'Mark as read'}</span>
+              <span class="notification-open">${n.kind==='comment'&&!n.sample?'View comment':photo?'View photo':n.post?'Open memory':catchup?'View catch-up':'Mark as read'}</span>
             </div>
           </a>
+          ${requestAction}
         </article>`;
       }).join('')}</section>`:'<p>No notifications yet.</p>'}`;
   },
