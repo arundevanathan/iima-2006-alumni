@@ -611,3 +611,25 @@ test('notification migrations preserve existing history and backfill genuine off
  sqlite.exec(history);assert.equal(sqlite.prepare('SELECT count(*) n FROM notifications').get().n,before);
  assert.deepEqual(sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
 });
+
+
+test('one shared mobile navigation sits outside the header on site and WhatsApp pages',async()=>{
+ const {call,session}=fixture();const ck=await session(2,'bbbb');
+ for(const path of ['/','/people','/people/2','/memories','/gallery','/reunion','/notifications','/profile','/wa/']){
+  const html=await body(await call(path,ck));
+  assert.equal((html.match(/<nav class="app-bottom-nav"/g)||[]).length,1,path);
+  assert.ok(html.indexOf('<nav class="app-bottom-nav"')>html.indexOf('</header>'),path);
+  assert.match(html,/viewport-fit=cover/);
+  assert.match(html,/<body class="[^"]*has-mobile-nav/);
+ }
+ assert.doesNotMatch(await body(await call('/signin')),/<nav class="app-bottom-nav"/);
+ const {skin}=await import('../whatsapp.mjs');
+ const template='<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body class="story"><nav class="sitebar"></nav><main>Story</main></body></html>';
+ for(const current of ['me','batch']){
+  const html=skin(template,{nonce:'test',theme:'dark',current});
+  assert.match(html,/<body class="story has-mobile-nav">/);
+  assert.equal((html.match(/<nav class="app-bottom-nav"/g)||[]).length,1);
+  assert.match(html,/<a href="\/wa\/" aria-current="page">WhatsApp<\/a>/);
+  assert.ok(html.indexOf('<nav class="app-bottom-nav"')>html.indexOf('</main>'));
+ }
+});
