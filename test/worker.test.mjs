@@ -514,3 +514,19 @@ test('WhatsApp Insights require all five details and both photos on pages and AP
  assert.equal((await call('/wa/api/group',ck)).status,403);
  assert.match((await call('/wa/')).headers.get('location'),/^\/signin/);
 });
+
+
+test('admin can preview locked Insights without changing profiles or access',async()=>{
+ const {call,session,sqlite}=fixture();
+ const admin=await session(1,'aaaa'),member=await session(2,'bbbb');
+ for(const [field,value]of Object.entries({city:'Mumbai',life:'Life',family:'Family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(1,field,value);
+ assert.match(await body(await call('/wa/',admin)),/isn’t up yet/);
+ const before=sqlite.prepare('SELECT * FROM profile_fields ORDER BY member,field').all();
+ const html=await body(await call('/wa/?preview=locked',admin));
+ assert.match(html,/Admin preview: locked WhatsApp Insights/);
+ assert.match(html,/0 of 7 requirements complete/);
+ assert.deepEqual(sqlite.prepare('SELECT * FROM profile_fields ORDER BY member,field').all(),before);
+ assert.match(await body(await call('/wa/',admin)),/isn’t up yet/);
+ assert.equal((await call('/wa/?preview=locked',member)).status,403);
+ assert.match((await call('/wa/?preview=locked')).headers.get('location'),/^\/signin/);
+});
