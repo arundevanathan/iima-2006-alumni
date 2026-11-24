@@ -105,7 +105,9 @@ async function route(req, env, record, setViewer) {
   const token = req.headers.get('Cookie')?.match(/(?:^|;\s*)__Host-alumni=([a-f0-9-]+)/)?.[1];
   if (path==='/logout' && post) {
     if (token) await run('DELETE FROM sessions WHERE token=?',await hash(token));
-    return redirect('/signin?signed-out=1',{'Set-Cookie':cookie('',0),'Clear-Site-Data':'"cache"'});
+    const headers={'Set-Cookie':cookie('',0),'Cache-Control':'private, no-store'};
+    if(req.headers.get('Accept')==='application/json')return Response.json({signedOut:true},{headers});
+    return redirect('/signin?signed-out=1',headers);
   }
   const member = token && await one(`SELECT m.*,r.name FROM sessions s JOIN members m ON m.id=s.member
     JOIN roster r ON r.id=m.id WHERE s.token=? AND s.expires>? AND m.suspended=0 AND (?=0 OR m.invited=1 OR m.role='admin')`,await hash(token),now(),+pilot);
