@@ -67,3 +67,8 @@ Home and Memories wrap the real memory feed in a blurred, inert preview until th
 Incomplete profiles continue to show their incoming catch-up count and can send requests. Incoming request identities, photos and acceptance controls stay masked on profiles and in Notifications until all seven profile requirements are complete. Acceptance also checks completion on the server. Notifications remain stored and reveal normally after completion.
 
 On an owner profile, the checklist links target stable `profile-field-*` anchors. Clicking an Add link opens the enclosing details panels, opens the exact field editor and focuses its input; photo links focus the corresponding visible upload button. Missing required fields/photos have a Required to unlock badge, while optional missing details are grouped separately. Profile headshots, company, education and optional questions are explicitly excluded from the completion rule.
+
+
+## Profile and footer cleanup
+
+Owner profiles use one compact completion summary with missing-item links and a single Continue profile action. The full seven-item checklist is collapsed under All 7 requirements. The masked catch-up section links back to this summary rather than repeating its own completion button. On mobile, missing required details appear before Then/Now photos; catch-up and optional details follow. Home no longer repeats a separate WhatsApp completion banner above the memories incentive. Own profiles omit the self-report control. The footer now contains branding and the theme switch only, since the main header and persistent mobile bar already provide navigation.
