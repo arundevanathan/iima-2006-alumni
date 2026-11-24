@@ -103,7 +103,7 @@ const collage=(rows,next,priority=false)=>`<div data-feed>${memoryBatch(rows,pri
 ${next?`<a class="feed-more" data-feed-next href="${e(next)}" aria-label="Load more memories">Load more memories</a>`:''}
 ${memoryDialog()}`;
 export function render(title,body,member,{home=false}={}) {
-  const sectionOf = {Memories:'/memories',Classmates:'/people','December reunion':'/reunion',Gallery:'/gallery',Notifications:'/notifications',WhatsApp:'/wa/'};
+  const sectionOf = {Memories:'/memories',Classmates:'/people','December reunion':'/reunion',Gallery:'/gallery',Notifications:'/notifications',WhatsApp:'/wa/','WhatsApp Insights':'/wa/'};
   const current = title===reunionTitle ? '/' : sectionOf[title];
   const tab = (href,label) => `<a href="${href}"${href===current?' aria-current="page"':''}>${label}</a>`;
   const menu=tab('/','Home')+tab('/memories','Memories')+tab('/people','Classmates')+tab('/reunion','Reunion')+tab('/wa/','WhatsApp');
@@ -129,7 +129,21 @@ export function render(title,body,member,{home=false}={}) {
   .directory-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(10rem,100%),1fr));gap:1rem}.directory-card{display:block;overflow:hidden;background:var(--tile);border:1px solid var(--line);border-radius:1rem;text-decoration:none}.directory-card img,.directory-card .initials{width:100%;aspect-ratio:1;display:grid;place-items:center;background:var(--tint);border-radius:0;font-size:2rem}.directory-card div{padding:.75rem}.directory-card small{display:block}
   .memory-nav{display:flex;flex-wrap:wrap;gap:.6rem 1.3rem;align-items:center;margin-bottom:1rem}.memory-feed{max-width:44rem}
   @media(max-width:600px){.directory-controls{grid-template-columns:1fr 1fr}.directory-controls label:first-child{grid-column:1/-1}}
-  </style><body class="${home?'home ':''}${member?'member-site ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?'<script src="/social.js?v=13" defer></script>':''}</html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+  </style><body class="${home?'home ':''}${member?'member-site ':''}page-${slug}${banded?' page-band':''}"><header class="bar"><div class="mast"><a class="wordmark" href="/" aria-label="IIMA Class of 2006, home"><img src="/campus/logo.png" alt=""><span class="wm-iima">IIMA</span><span class="wm-class">Class of 2006</span></a>${nav}</div></header><main>${home?'':'<h1>'+e(title)+'</h1>'}${body}</main>${footer}${member?'<script src="/social.js?v=14" defer></script>':''}</html>`,{headers:{'Content-Type':'text/html; charset=utf-8'}});
+}
+export function whatsappRequirements(details, photos={}) {
+  return [['dorm','Dorm number'],['nickname','Dorm name'],['city','Current city'],['life','Life, Lately'],['family','Family']]
+    .map(([key,label])=>({key,label,complete:!!String(details[key]??'').trim()}))
+    .concat(['then','now'].map(slot=>({key:slot,label:slot==='then'?'Then photo (2006)':'Now photo (2026)',complete:!!photos[slot]})));
+}
+export function whatsappUnlock(checks, me, own=false) {
+  const missing=checks.filter(check=>!check.complete), complete=!missing.length;
+  return `<section class="panel whatsapp-unlock" id="whatsapp-unlock" aria-labelledby="whatsapp-unlock-title">
+    <h2 id="whatsapp-unlock-title">${complete?'Your WhatsApp Insights are unlocked':'Complete your profile to unlock WhatsApp Insights'}</h2>
+    <p>${complete?'Explore your personal WhatsApp story and the batch’s years together.':'Discover your WhatsApp story and the batch’s years together. Add all five profile details and both photos to unlock access.'}</p>
+    ${complete?'':`<p><strong>${checks.length-missing.length} of ${checks.length} requirements complete</strong></p><ul class="unlock-checklist">${checks.map(check=>`<li><span aria-hidden="true">${check.complete?'✓':'○'}</span> ${e(check.label)} <small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul><p>Optional prompts and “Anything else” are not required.</p>`}
+    <a class="cta profile-primary" ${own&&!complete?'data-unlock-edit ':''}href="${complete?'/wa/':'/people/'+me+'?complete=whatsapp#whatsapp-unlock'}">${complete?'View WhatsApp Insights':'Complete my profile'}</a>
+  </section>`;
 }
 export const page={
   socialScript,
@@ -155,7 +169,7 @@ export const page={
         button.disabled=false;
       }
     });`,
-  home(rows,people,next,key,me,meet={available:false}){
+  home(rows,people,next,key,me,meet={available:false},unlock=[]){
     return `<div class="alumni-home"><section class="campus-hero"><div>
       <p class="class-label">IIM Ahmedabad · Class of 2006</p><h1 class="reunion-title" aria-label="${reunionTitle}">${titleCreative()}</h1>
       <p class="hero-lede">Twenty years since LKP. Find your batchmates, trade the old stories, and see you in Jaipur.</p>
@@ -166,6 +180,7 @@ export const page={
         <div class="meet-mine">${meet.picked.length?`<span class="meet-faces">${meetFaces(meet.picked)}</span><span class="registry">You’ve picked ${meet.picked.length}</span>`:'<span class="meet-hint">Pick the WIMWIans you most want to catch up with in Jaipur. Only you see your list.</span>'}
           <a class="cta cta-primary" href="/people/${me}#meet">${meet.picked.length?'Add more':'Choose who to catch up with'}</a></div>
       </section>`:''}
+      ${unlock.length?whatsappUnlock(unlock,me):''}
       <section class="home-classmates"><div class="section-head"><h2>What are they up to?</h2>${link('/people','See all')}</div>
         <div class="people-grid" role="region" aria-label="What are they up to? Scroll to browse classmates" data-classmate-strip tabindex="0">${people.map(row=>`<a class="person-tile" href="/people/${row.id}">${portrait(row,true,256)}<div>${classmate(row)}</div></a>`).join('')}</div>
       </section>
@@ -306,6 +321,7 @@ export const page={
           </div>
         </div>
       </header>
+      ${own?whatsappUnlock(whatsappRequirements(details,profilePhotos),me,true):''}
       ${pilot?'<p class="profile-pilot">Profiles are being checked during the pilot.</p>':''}
       <div class="profile-layout${factKeys.length||photos.length||todoKeys.length?'':' profile-layout-wide'}">
         ${factKeys.length||photos.length||todoKeys.length?`<aside class="profile-sidebar">
