@@ -55,3 +55,8 @@ Migration 0016 backfills genuine historical likes, comments and mentions using t
 ## Mobile navigation
 
 `navigation.mjs` owns the shared five-tab mobile bar and its styles. It is a direct child of the body on both main-site and reskinned WhatsApp pages, outside sticky headers and content containers. Keep its dimensions and safe-area padding in this shared module. The desktop menu remains in the header. At phone widths, full-width main containers must not also have horizontal outer margins: that creates a horizontal scrollbar which reduces the usable viewport and shifts fixed navigation.
+
+
+## Memories completion prompt
+
+Home and Memories wrap the real memory feed in a blurred, inert preview until the same seven profile requirements as WhatsApp Insights are complete. The overlay shows completion progress, missing items and a Complete my profile action. This is deliberately a visual completion incentive: memory details, media, notifications and feed endpoints retain their existing signed-in access. The preview disables interaction and automatic infinite-feed loading within the blurred area. Completing the profile removes the treatment on the next page load. WhatsApp Insights retains its server-enforced completion requirement.
