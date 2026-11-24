@@ -27,5 +27,6 @@ body>nav.app-bottom-nav{display:none}
   body>nav.app-bottom-nav>a:hover{color:var(--brick);background:var(--tint)}
   body>nav.app-bottom-nav>a:focus-visible{outline:2px solid var(--brick);outline-offset:-4px}
 }
+@media(max-width:360px){body>nav.app-bottom-nav>a{font-size:.8125rem;letter-spacing:-.01em}}
 @media print{body>nav.app-bottom-nav{display:none!important}body.has-mobile-nav{padding-bottom:0!important}}
 `;
