@@ -81,4 +81,4 @@ The server removes the session and expires the cookie. It returns a small confir
 
 ## Reunion browsing
 
-Reunion attendees use two compact square-thumbnail cards per mobile row with responsive 256/480/768px image candidates. Personal reunion details are collapsed when the existing completeness rules are satisfied, and stay open when required details are missing or after a save. The review link and child/detail fragment links reopen the accordion. The attendee list precedes the agenda so completed attendees can browse classmates sooner.
+Reunion attendees use two compact square-thumbnail cards per mobile row with responsive 256/480/768px image candidates. Personal reunion details are collapsed when the existing completeness rules are satisfied, and stay open when required details are missing or after a save. The review link and child/detail fragment links reopen the accordion. The agenda is a compact expandable section near the top, before personal details and the attendee list.
