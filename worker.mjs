@@ -267,7 +267,8 @@ async function route(req, env, record, setViewer) {
       return render('WhatsApp Insights',whatsappUnlock(checks,me),member);
     }
 
-    const response = await whatsappRoute({path,u,req,env,member,admin,all,one,render});
+    const author=path==='/wa/'?await one(`SELECT ${portrait} AS portrait FROM roster r ${seedJoin} WHERE r.id=88`,+pilot):null;
+    const response = await whatsappRoute({path,u,req,env,member,admin,all,one,render,author});
     if (response) return response;
   }
   const postVisible = 'p.hidden=0 AND (p.topic IS NULL OR EXISTS(SELECT 1 FROM topics t WHERE t.id=p.topic AND t.hidden=0))';
