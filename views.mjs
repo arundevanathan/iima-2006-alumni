@@ -123,6 +123,28 @@ const memoryBatch=(rows,priority=false)=>`<div class="memory-collage">${memoryCa
 const collage=(rows,next,priority=false)=>`<div data-feed>${memoryBatch(rows,priority)}</div>
 ${next?`<a class="feed-more" data-feed-next href="${e(next)}" aria-label="Load more memories">Load more memories</a>`:''}
 ${memoryDialog()}`;
+
+export function reunionCatchups(rows,wishes,me,unlocked,filter='') {
+  const byPerson=new Map();
+  for(const wish of wishes){
+    const outgoing=wish.member===me;
+    if(!outgoing&&!unlocked)continue;
+    const key=outgoing?wish.target:wish.member;
+    const state=byPerson.get(key)||{confirmed:false,incoming:null,outgoing:false};
+    state.confirmed ||= wish.accepted_at!==null && wish.accepted_at!==undefined;
+    if(!wish.accepted_at){if(outgoing)state.outgoing=true;else state.incoming=wish.request_id;}
+    byPerson.set(key,state);
+  }
+  const enriched=rows.map(row=>{
+    const state=byPerson.get(row.id);
+    const catchup=row.id===me?'none':state?.confirmed?'confirmed':state?.incoming?'incoming':state?.outgoing?'outgoing':'none';
+    return {...row,catchup,catchup_request:catchup==='incoming'?state.incoming:null};
+  });
+  const rank={incoming:0,confirmed:1,outgoing:2,none:3};
+  return enriched.filter(row=>!filter||(filter==='requested'?['incoming','outgoing'].includes(row.catchup):row.catchup===filter))
+    .sort((a,b)=>rank[a.catchup]-rank[b.catchup]||a.name.localeCompare(b.name));
+}
+
 export function render(title,body,member,{home=false,active=null}={}) {
   const sectionOf = {Memories:'/memories',Classmates:'/people','December reunion':'/reunion',Gallery:'/gallery',Notifications:'/notifications',WhatsApp:'/wa/','WhatsApp Insights':'/wa/','Edit profile':'/people'};
   const current = active || (title===reunionTitle ? '/' : sectionOf[title]);
@@ -327,8 +349,19 @@ export const page={
 
     </div>`;
   },
-  directory(rows,statuses,q,status,dorms,dorm,reunion=false,sections=[],section=''){return `<div class="classmates-directory"><form class="directory-controls" data-directory-filters method="get" action="${reunion?'/reunion#reunion-attendees':'/people'}">${input('q','Name, nickname or dorm',q)}${reunion?'':select('status','Attendance',[['','All classmates'],...Object.entries(statuses).filter(([,label])=>label)],status)}${dorms.length?select('dorm','Dorm',[['','All dorms'],...dorms.map(({dorm})=>[dorm,/^\d+$/.test(dorm)?'Dorm '+dorm:dorm])],dorm):''}${reunion?'':select('section','Section',[['','All sections'],...sections.map(({section})=>[section,section])],section)}<button>Search</button></form>
-    ${rows.length?`<p class="registry directory-count">${rows.length} ${reunion?'attending':rows.length===1?'classmate':'classmates'}</p><div class="directory-grid">${rows.map(row=>`<a class="directory-card" href="/people/${row.id}">${portrait(row,true,256,'(max-width:650px) 42vw, 220px')}<div>${classmate(row,reunion||!row.section?[]:['Section '+row.section])}${!reunion&&row.status==='attending'?`<small class="attend-yes">${e(statuses[row.status]||'Attending')}</small>`:''}</div></a>`).join('')}</div>`:status==='attending'?'<p>No classmates are marked as attending for these filters.</p>':'<p>No classmates match.</p>'}</div>`;},
+  directory(rows,statuses,q,status,dorms,dorm,reunion=false,sections=[],section='',catchup='',next='/reunion#reunion-attendees'){
+    const labels={confirmed:'Catch up confirmed',incoming:'Catch up requested',outgoing:'Catch up requested'};
+    return `<div class="classmates-directory"><form class="directory-controls" data-directory-filters method="get" action="${reunion?'/reunion#reunion-attendees':'/people'}">
+      ${input('q','Name, nickname or dorm',q)}${reunion?'':select('status','Attendance',[['','All classmates'],...Object.entries(statuses).filter(([,label])=>label)],status)}
+      ${dorms.length?select('dorm','Dorm',[['','All dorms'],...dorms.map(({dorm})=>[dorm,/^\\d+$/.test(dorm)?'Dorm '+dorm:dorm])],dorm):''}
+      ${select('section','Section',[['','All sections'],...sections.map(({section})=>[section,section])],section)}
+      ${reunion?select('catchup','Catch up status',[['','Everyone attending'],['confirmed','Confirmed'],['requested','Requested · either direction'],['incoming','Awaiting your confirmation'],['outgoing','Awaiting their confirmation'],['none','No request']],catchup):''}<button>Search</button></form>
+      ${reunion?'<p class="registry">Awaiting your confirmation first, then confirmed catch-ups, then requests you’ve sent.</p>':''}
+      ${rows.length?`<p class="registry directory-count">${rows.length} ${reunion?'attending':rows.length===1?'classmate':'classmates'}</p><div class="directory-grid">${rows.map(row=>{
+        const content=`<a class="directory-card" href="/people/${row.id}"><span style="display:block;position:relative">${portrait(row,true,256,'(max-width:650px) 42vw, 220px')}${reunion&&labels[row.catchup]?`<span style="position:absolute;bottom:.4rem;left:.35rem;right:.35rem;padding:.3rem .4rem;border-radius:.35rem;background:${row.catchup==='confirmed'?'#244e40':'#29221f'};color:#fff;font-size:.75rem;line-height:1.3;text-align:center;font-weight:600">${labels[row.catchup]}</span>`:''}</span><div>${classmate(row,row.section?['Section '+row.section]:[])}${!reunion&&row.status==='attending'?`<small class="attend-yes">${e(statuses[row.status]||'Attending')}</small>`:''}</div></a>`;
+        return reunion?`<div class="reunion-catchup-card" style="min-width:0">${content}${row.catchup==='incoming'?meetForm('accept',row.id,next,'Confirm catch up','reunion-confirm-catchup',row.catchup_request):row.catchup==='outgoing'?'<small style="display:block;padding:.3rem .5rem">Awaiting their confirmation</small>':''}</div>`:content;
+      }).join('')}</div>`:status==='attending'?'<p>No classmates are marked as attending for these filters.</p>':'<p>No classmates match.</p>'}</div>`;
+  },
   person(row,status,details,photos,stories,me,pilot,composeKey,profilePhotos={},meet={available:false}){
     const own = me === row.id;
     const received = stories.filter(post=>post.author!==row.id);
