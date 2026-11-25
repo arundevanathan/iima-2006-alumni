@@ -78,6 +78,8 @@ html .tn{min-width:0}
 .wa-solo .wa-detail{margin:1rem 0 2rem;font-size:1.05rem;color:var(--ink-2);max-width:38rem}
 .wa-solo .cta{display:inline-block;padding:.8rem 1.2rem;background:var(--accent);color:var(--on-accent);text-decoration:none}
 body:has(.wa-solo){background:var(--page);color:var(--ink);margin:0;min-height:100vh}
+.wa-credit{max-width:1120px;margin:14px auto 0;padding:0 clamp(14px,4vw,32px);font:400 .9rem/1.5 var(--sans);color:var(--muted)}
+.wa-credit a{color:var(--accent);font-weight:650;text-decoration:underline;text-underline-offset:.18em}
 .wa-admin{max-width:1120px;margin:12px auto 0;padding:8px 14px;border:1px dashed var(--axis);border-radius:4px;font:500 .8rem var(--mono);color:var(--muted)}
 `;
 
@@ -97,7 +99,8 @@ export function skin(html, { nonce, theme, current, admin }) {
     `<a id="navMe" href="/wa/"${current === 'me' ? ' aria-current="page"' : ''}>Your page</a>` +
     `<a id="navStory" hidden href="/wa/batch"></a>` +   // kept for the kit's script, which sets its href; never shown
     `<a class="back" href="/">Back to the site</a>${themeSwitch()}</div></nav>` +
-    (admin ? `<p class="wa-admin">${escapeHtml(admin)}</p>` : '');
+    (admin ? `<p class="wa-admin">${escapeHtml(admin)}</p>` : '') +
+    (current === 'me' ? '<p class="wa-credit">Personalized Deep-dive by <a href="/people/88">Hari Balaji</a></p>' : '');
   const dark = theme !== 'light';
   return html
     .replace(/<link[^>]+fonts\.(?:googleapis|gstatic)\.com[^>]*>\s*/g, '')
