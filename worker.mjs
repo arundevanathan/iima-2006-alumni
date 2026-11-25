@@ -118,10 +118,18 @@ async function route(req, env, record, setViewer) {
     JOIN roster r ON r.id=m.id WHERE s.token=? AND s.expires>? AND m.suspended=0 AND (?=0 OR m.invited=1 OR m.role='admin')`,await hash(token),now(),+pilot);
   setViewer(member?.id ?? null);
   const visibleSeed = "(s.review_status='approved' OR (?=1 AND s.review_status='pending'))";
-  const portrait = `coalesce((SELECT 'portrait/'||r.id FROM profile_fields WHERE member=r.id AND field='portraitObject' AND value<>''),(SELECT 'yearbook/'||y.member||'/'||j.key FROM yearbook_public y,json_each(y.images) j
-    JOIN photos ph ON ph.submission=json_extract(j.value,'$.submission') AND ph.object_key=json_extract(j.value,'$.key')
-    WHERE y.member=r.id ORDER BY ph.slot='now' DESC,j.key LIMIT 1),
-    CASE WHEN s.portrait_key IS NOT NULL THEN 'seed/'||r.id END)`;
+  const portrait = `coalesce(
+    (SELECT 'portrait/'||r.id FROM profile_fields WHERE member=r.id AND field='portraitObject' AND trim(value)<>''),
+    CASE WHEN trim(coalesce(s.portrait_key,''))<>'' THEN 'seed/'||r.id END,
+    (SELECT 'profile-photo/'||r.id||'/now' FROM profile_fields WHERE member=r.id AND field='nowPhotoObject' AND trim(value)<>''),
+    (SELECT 'yearbook/'||y.member||'/'||j.key FROM yearbook_public y,json_each(y.images) j
+      JOIN photos ph ON ph.submission=json_extract(j.value,'$.submission') AND ph.object_key=json_extract(j.value,'$.key')
+      WHERE y.member=r.id AND ph.slot='now' ORDER BY j.key LIMIT 1),
+    (SELECT 'profile-photo/'||r.id||'/then' FROM profile_fields WHERE member=r.id AND field='thenPhotoObject' AND trim(value)<>''),
+    (SELECT 'yearbook/'||y.member||'/'||j.key FROM yearbook_public y,json_each(y.images) j
+      JOIN photos ph ON ph.submission=json_extract(j.value,'$.submission') AND ph.object_key=json_extract(j.value,'$.key')
+      WHERE y.member=r.id AND ph.slot='then' ORDER BY j.key LIMIT 1)
+  )`;
   const seedJoin = `LEFT JOIN profile_seeds s ON s.roster_id=r.id AND ${visibleSeed}`;
   const show = (title,body) => render(title,body,member);
   const data = () => req.formData();
