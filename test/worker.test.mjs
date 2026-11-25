@@ -3,6 +3,58 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import worker from '../worker.mjs';
+import { profileMemoryRows } from '../views.mjs';
+
+test('photo-tag projections deduplicate photos and preserve album associations',()=>{
+ const post={id:'album',author:1,profile_album_tag:0,album_cover:'b',album_title:'Trip',collage_photos:JSON.stringify(['post/a','post/b']),profile_photo_links:JSON.stringify([
+  {media:'post/b',kind:'person',href:'/people/2',label:'Tagged'},
+  {media:'post/b',kind:'person',href:'/people/2',label:'Tagged'},
+  {media:'post/a',kind:'person',href:'/people/3',label:'Other'},
+  {media:'post/missing',kind:'person',href:'/people/2',label:'Stale'}])};
+ const rows=profileMemoryRows([post],2);
+ assert.equal(rows.length,1);assert.equal(rows[0].photo_scope,'post/b');
+ assert.deepEqual(JSON.parse(rows[0].collage_photos),['post/b']);
+ assert.equal(rows[0].album_photo_total,2);
+ assert.equal(profileMemoryRows([post],1)[0],post);
+ const albumTagged={...post,profile_album_tag:1};
+ assert.equal(profileMemoryRows([albumTagged],2)[0],albumTagged);
+});
+
+test('photo-only tags show actionable photo memories on profiles and gallery',async()=>{
+ const {call,session,sqlite}=fixture();
+ const author=await session(1,'aaaa'),tagged=await session(2,'bbbb');
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aA1sAAAAASUVORK5CYII=','base64');
+ const ids=[crypto.randomUUID(),crypto.randomUUID(),crypto.randomUUID()];
+ const albumId=crypto.randomUUID();
+ for(const id of ids){const f=new FormData();f.set('photo',new File([png],'photo.png',{type:'image/png'}));assert.equal((await call('/compose/photo?id='+id,author,f)).status,200);}
+ const form=new FormData();form.set('id',albumId);form.set('title','Tagged photo journey');form.set('body','Album caption');
+ for(const id of ids)form.append('photoId',id);
+ assert.equal((await call('/compose',author,form)).status,303);
+ const url='/posts/'+albumId,media='post/'+ids[1];
+ assert.equal((await call(url,author,{action:'tag-add',tag:'person:2',photo:media})).status,303);
+ for(const route of ['/people/2','/gallery?person=2']){
+  const html=await body(await call(route,tagged));
+  assert.match(html,new RegExp('data-photo-scope="post/'+ids[1]+'"'));
+  assert.match(html,/Photo from Tagged photo journey/);
+  assert.match(html,/Tap to open album · 3 photos/);
+  assert.match(html,new RegExp('#photo-post-'+ids[1]));
+  assert.match(html,/data-like/);assert.match(html,/data-panel="comments"/);assert.match(html,/data-panel="tags"/);
+  assert.doesNotMatch(html,/profile-section profile-photos/);
+ }
+ assert.equal((await call(url,tagged,{action:'tag-add',tag:'topic:lkp',photo:media},{Accept:'application/json'})).status,200);
+ const own=await body(await call('/people/2',tagged));assert.match(own,/@Test Classmate/);assert.match(own,/#LKP/);
+ await call(url,tagged,{action:'comment',body:'Comment shared with the album'},{Accept:'application/json'});
+ const comments=await(await call(url+'?panel=comments',tagged)).json();assert.equal(comments[0].body,'Comment shared with the album');
+ await call(url,tagged,{action:'like',liked:'1'},{Accept:'application/json'});
+ assert.equal(sqlite.prepare('SELECT count(*) n FROM likes WHERE post=?').get(albumId).n,1);
+ const authorProfile=await body(await call('/people/1',tagged));assert.match(authorProfile,/album-collage-3/);
+ assert.doesNotMatch(authorProfile,/data-photo-scope=/);
+ await call(url,author,{action:'tag-add',tag:'person:2'});
+ const wholeAlbum=await body(await call('/people/2',tagged));assert.match(wholeAlbum,/album-collage-3/);assert.doesNotMatch(wholeAlbum,/data-photo-scope=/);
+ sqlite.prepare('UPDATE posts SET hidden=1 WHERE id=?').run(albumId);
+ assert.doesNotMatch(await body(await call('/people/2',tagged)),/Tagged photo journey/);
+ assert.doesNotMatch(await body(await call('/gallery?person=2',tagged)),/Tagged photo journey/);
+});
 
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
@@ -625,14 +677,14 @@ test('WhatsApp Insights require all five details and both photos on pages and AP
  assert.match(prompt,/Complete your profile to unlock WhatsApp Insights/);
  for(const label of ['Dorm number','Dorm name','Current city','Life, Lately','Family','Then photo (2006)','Now photo (2026)'])assert.ok(prompt.includes(label),label);
  assert.match(await body(await call('/',ck)),/Complete your profile to access memories/);
- assert.match(await body(await call('/people/2',ck)),/data-unlock-edit/);
+ assert.match(await body(await call('/people/2',ck)),/href="\/profile#profile-field-/);
  for(const path of ['/wa/','/wa/batch','/wa/story.html'])assert.match(await body(await call(path,ck)),/Complete your profile to unlock WhatsApp Insights/);
  for(const path of ['/wa/api/me','/wa/api/group','/wa/api/me?person=P001']){
   const response=await call(path,ck);assert.equal(response.status,403);assert.equal((await response.json()).error,'profile_incomplete');
  }
  for(const [field,value] of Object.entries({city:'Mumbai',life:'My life',family:'My family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,field,value);
  assert.match(await body(await call('/wa/',ck)),/isn’t up yet/);
- assert.match(await body(await call('/people/2',ck)),/Your WhatsApp Insights are unlocked/);
+ assert.match(await body(await call('/people/2',ck)),/Your essentials are all set/);
  // Explicit owner blanks must override imported data and relock access immediately.
  for(const field of ['dorm','nickname','city','life','family']){
   sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,field,'   ');
@@ -665,8 +717,7 @@ test('owner editing is visible and the full editor uses resolved profile values'
  const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
  const own=await body(await call('/people/2',ck));
  assert.match(own,/<a class="edit-toggle" href="\/profile">Edit profile<\/a>/);
- assert.match(own,/aria-label="Upload profile photo"/);
- assert.match(own,/aria-label="Upload Then photo"/);
+ assert.doesNotMatch(own,/<button[^>]*data-upload|<form[^>]*action="\/profile"/);
  assert.doesNotMatch(own,/data-edit-toggle|data-editable/);
  const other=await body(await call('/people/1',ck));assert.doesNotMatch(other,/class="edit-toggle"|data-profile-edit/);
  let editor=await body(await call('/profile',ck));assert.match(editor,/An imported bio/);assert.match(editor,/>D2<\/textarea>/);
@@ -798,27 +849,27 @@ test('required profile checklist links identify and highlight exactly the missin
  const {call,session,sqlite}=fixture();const ck=await session(2,'bbbb');
  const html=await body(await call('/people/2',ck));
  assert.match(html,/class="panel profile-completion-summary"/);
- assert.match(html,/Only the five details and two photos below are required/);
+ assert.match(html,/Minimum requirements completion/);
+ const full=await body(await call('/profile',ck));
  for(const key of ['city','family','then','now']){
-  assert.ok(html.includes('href="#profile-field-'+key+'"'),key+' checklist link');
-  assert.ok(html.includes('id="profile-field-'+key+'"'),key+' target');
+  assert.ok(html.includes('href="/profile#profile-field-'+key+'"'),key+' checklist link');
+  assert.ok(full.includes('id="profile-field-'+key+'"'),key+' editor target');
  }
- assert.match(html,/data-required-jump="city"/);
- const full=await body(await call('/profile',ck));assert.match(full,/5 required profile details/);assert.match(full,/2 required photos/);assert.match(full,/Optional career details/);
- assert.match(html,/Required to unlock/);
- assert.match(html,/Optional details/);
- assert.match(html,/Add Then photo/);assert.match(html,/Add Now photo/);
+ assert.match(full,/The essentials · 5 required details/);assert.match(full,/2 required photos/);assert.match(full,/Your work and studies/);
+ assert.match(full,/Required to unlock/);
+ assert.match(full,/A little more you/);
+ for(const key of ['then','now'])assert.ok(full.includes('id="profile-field-'+key+'" class="profile-required-missing"'));
  const other=await body(await call('/people/1',ck));assert.doesNotMatch(other,/Required to unlock|data-required-jump/);
 });
 
 
-test('profile has one completion summary and footer omits duplicate navigation',async()=>{
+test('profile has two completion scores and footer omits duplicate navigation',async()=>{
  const {call,session}=fixture();const ck=await session(2,'bbbb');
  await call('/meet',ck,{action:'add',target:'1'});
  const recipient=await session(1,'aaaa');
  const html=await body(await call('/people/1',recipient));
- assert.equal((html.match(/class="panel profile-completion-summary"/g)||[]).length,1);
- assert.equal((html.match(/>Continue profile<\/a>/g)||[]).length,1);
+ assert.equal((html.match(/class="panel profile-completion-summary"/g)||[]).length,2);
+ assert.equal((html.match(/>Continue your profile<\/a>/g)||[]).length,1);
  assert.doesNotMatch(html,/>Complete my profile<\/a>/);
  const footer=html.match(/<footer class="site-footer">[\s\S]*?<\/footer>/)[0];
  assert.doesNotMatch(footer,/<nav|href="\/memories"/);
