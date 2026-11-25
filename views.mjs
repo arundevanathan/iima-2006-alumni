@@ -157,13 +157,29 @@ export function whatsappRequirements(details, photos={}) {
     .map(([key,label])=>({key,label,complete:!!String(details[key]??'').trim()}))
     .concat(['then','now'].map(slot=>({key:slot,label:slot==='then'?'Then photo (2006)':'Now photo (2026)',complete:!!photos[slot]})));
 }
-export function whatsappUnlock(checks, me, own=false) {
+export function whatsappUnlock(checks, me, own=false, details={}) {
   const missing=checks.filter(check=>!check.complete), complete=!missing.length;
-  if(own)return `<section class="panel profile-completion-summary" id="whatsapp-unlock" aria-labelledby="profile-progress-title">
-    <div class="profile-progress-heading"><h2 id="profile-progress-title">${complete?'Your essentials are complete':'The essentials'}</h2><strong>${checks.length-missing.length} of ${checks.length} complete</strong></div>
-    ${complete?'<p>Your memories, WhatsApp Insights and catch-up requests are unlocked.</p><p><strong>Now add a little colour.</strong> A memory, an unexpected turn, or something you’re into these days will help your batchmates reconnect with the person behind the profile.</p><a href="/profile#a-little-more-you">Add a little more you</a> · <a href="/wa/">View WhatsApp Insights</a>':`<progress max="${checks.length}" value="${checks.length-missing.length}" aria-label="Profile completion"></progress><p>Finish these items to unlock memories, WhatsApp Insights and incoming catch-up names.</p><ul class="profile-missing-items">${missing.map(check=>`<li><a href="/profile#profile-field-${check.key}">${e(check.label)}</a></li>`).join('')}</ul><a class="cta profile-primary" href="/profile#profile-field-${missing[0].key}">Edit profile</a>`}
-    <details class="profile-all-requirements"><summary>All 7 requirements</summary><p>These five details and two photos unlock access. A few extra stories will make your profile more personal.</p><ul class="unlock-checklist">${checks.map(check=>`<li><span aria-hidden="true">${check.complete?'✓':'○'}</span><span>${e(check.label)}</span><small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul></details>
-  </section>`;
+  if(own){
+    const extraKeys=['company','education','outsideWork','moment','firstDayAdvice','anythingElse'];
+    const extra=extraKeys.map(key=>({key,label:profilePrompts[key]?.[0]||labelFor(key),complete:!!String(details[key]??'').trim()}));
+    const extraDone=extra.filter(item=>item.complete).length;
+    const firstExtra=extra.find(item=>!item.complete);
+    return `<div class="profile-completion-scores">
+    <section class="panel profile-completion-summary" id="whatsapp-unlock" aria-labelledby="profile-progress-title">
+      <div class="profile-progress-heading"><h2 id="profile-progress-title">Minimum requirements completion</h2><strong>${checks.length-missing.length} / ${checks.length}</strong></div>
+      <progress max="${checks.length}" value="${checks.length-missing.length}" aria-label="Minimum requirements completion"></progress>
+      ${complete?'<p><strong>Your essentials are all set.</strong> Memories, WhatsApp Insights and incoming catch-up names are unlocked. Enjoy reconnecting!</p><a href="/wa/">Explore WhatsApp Insights</a>':`<p>You’re on your way. These five details and two photos unlock memories, WhatsApp Insights and the names of classmates who want to catch up with you.</p><a class="cta profile-primary" href="/profile#profile-field-${missing[0].key}">Continue your profile</a>`}
+      <details class="profile-all-requirements"><summary>${complete?'Your seven essentials':'What’s left to add?'}</summary><ul class="unlock-checklist">${checks.map(check=>`<li><span aria-hidden="true">${check.complete?'✓':'○'}</span><a href="/profile#profile-field-${check.key}">${e(check.label)}</a><small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul></details>
+    </section>
+    <section class="panel profile-completion-summary" aria-labelledby="additional-progress-title">
+      <div class="profile-progress-heading"><h2 id="additional-progress-title">Additional info completion</h2><strong>${extraDone} / ${extra.length}</strong></div>
+      <progress max="${extra.length}" value="${extraDone}" aria-label="Additional info completion"></progress>
+      <p>${extraDone===extra.length?'<strong>There’s so much more of you here now.</strong> Thank you for giving your classmates more stories and conversation starters.':extraDone?'<strong>Your story is taking shape.</strong> Another memory, a passion, or an unexpected turn helps classmates get to know the person you are today.':'<strong>A little more you goes a long way.</strong> Share a memory, a passion, or a little about your journey. Give your classmates something to smile about—or ask you about.'}</p>
+      <p><small>Always optional. Your access is unlocked by the minimum requirements alone. This score counts details shared, not how much you write.</small></p>
+      <a href="/profile#${firstExtra?'profile-field-'+firstExtra.key:'a-little-more-you'}">${extraDone===extra.length?'Revisit your stories':'Add a little more you'}</a>
+      <details class="profile-all-requirements"><summary>Six ways to share more</summary><ul class="unlock-checklist">${extra.map(item=>`<li><span aria-hidden="true">${item.complete?'✓':'○'}</span><a href="/profile#profile-field-${item.key}">${e(item.label)}</a><small>${item.complete?'Shared':'Optional'}</small></li>`).join('')}</ul></details>
+    </section></div>`;
+  }
   const target=key=>'/profile#profile-field-'+key;
   return `<section class="panel whatsapp-unlock" id="whatsapp-unlock" aria-labelledby="whatsapp-unlock-title">
     <h2 id="whatsapp-unlock-title">${complete?'Your WhatsApp Insights are unlocked':own?'Complete these 7 items to unlock everything':'Complete your profile to unlock WhatsApp Insights'}</h2>
@@ -370,7 +386,7 @@ export const page={
           </div>
         </div>
       </header>
-      ${own?whatsappUnlock(requirements,me,true):''}
+      ${own?whatsappUnlock(requirements,me,true,details):''}
       ${pilot?'<p class="profile-pilot">Profiles are being checked during the pilot.</p>':''}
       <div class="profile-layout${factKeys.length||photos.length||todoKeys.length?'':' profile-layout-wide'}">
         ${factKeys.length||photos.length||todoKeys.length?`<aside class="profile-sidebar">
@@ -420,7 +436,7 @@ export const page={
   editProfile(fields,member,checks=[]){
     const required=['dorm','nickname','city','life','family'],optional=['company','education'];
     const rows=keys=>keys.map(k=>`<div id="profile-field-${k}" class="${required.includes(k)&&!String(fields[k]||'').trim()?'profile-required-missing':''}">${required.includes(k)?'<small>Required to unlock</small>':''}${profileControl(k,k,fields[k])}${checkbox('hide_'+k,'Hide '+labelFor(k),fields[k]==='')}</div>`).join('');
-    const answer=(key,label=labelFor(key),control=profileControl('value',key,fields[key]))=>form('/profile',field('field',key)+control,'Save '+label);
+    const answer=(key,label=labelFor(key),control=profileControl('value',key,fields[key]))=>`<div id="profile-field-${key}">${form('/profile',field('field',key)+control,'Save '+label)}</div>`;
     return `<p><a href="/people/${member.id}">Back to my profile</a></p><p>Complete the essentials to unlock memories, WhatsApp Insights and incoming catch-up names. Write a few sentences for the story questions so your batchmates can catch up with you. Hiding a required detail keeps access locked.</p>`+
       form('/profile','<fieldset><legend>The essentials · 5 required details</legend>'+rows(required)+'</fieldset><section class="panel"><h2>Your work and studies</h2><p>Add these if you’d like to share more.</p>'+rows(optional)+'</section>'+checkbox('attendance_private','Hide my attendance status',!!member.attendance_private),'Save profile')+
       `<section class="panel"><h2>Then / Now · 2 required photos</h2><p>Choose a photo from your WIMWI days and one from your life today.</p>${['then','now'].map(key=>`<div id="profile-field-${key}"><h3>${key==='then'?'Then photo (2006)':'Now photo (2026)'}</h3><small>${checks.find(item=>item.key===key)?.complete?'Photo added · choose a file to replace it':'Required to unlock'}</small><form action="/profile" method="post" enctype="multipart/form-data">${field('field',key+'PhotoObject')}<label>Choose photo<input type="file" name="photo" accept="image/jpeg,image/png" required></label><button type="submit">Save ${key} photo</button></form></div>`).join('')}</section>`+
