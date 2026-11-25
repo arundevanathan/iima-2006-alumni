@@ -485,11 +485,11 @@ export const page={
       ${own?'':`<div class="profile-report">${report('profile',row.id)}</div>`}
     </div>`;
   },
-  editProfile(fields,member,checks=[]){
+  editProfile(fields,member,checks=[],profilePhotos={}){
     const required=['dorm','nickname','city','life','family'],optional=['company','education'];
     const missing=key=>!checks.find(item=>item.key===key)?.complete;
     const rows=keys=>keys.map(key=>`<div id="profile-field-${key}" class="${required.includes(key)&&missing(key)?'profile-required-missing':''}">${required.includes(key)?'<small>Required to unlock</small>':''}${profileControl(key,key,fields[key])}${required.includes(key)||optional.includes(key)?checkbox('hide_'+key,'Hide '+labelFor(key),fields[key]===''):''}</div>`).join('');
-    const photos=['then','now'].map(key=>`<div id="profile-field-${key}" class="${missing(key)?'profile-required-missing':''}"><h3>${key==='then'?'Then photo (2006)':'Now photo (2026)'}</h3><small>${missing(key)?'Required to unlock':'Photo added · choose a file to replace it'}</small><label>Choose photo<input type="file" name="${key}Photo" accept="image/jpeg,image/png"></label></div>`).join('');
+    const photos=['then','now'].map(key=>`<div id="profile-field-${key}" class="${missing(key)?'profile-required-missing':''}"><h3>${key==='then'?'Then photo (2006)':'Now photo (2026)'}</h3><small>${missing(key)?'Required to unlock':'Photo added · choose a file to replace it'}</small>${profilePhotos[key]?`<figure style="margin:.65rem 0"><a href="/media/${e(profilePhotos[key].media)}" target="_blank" rel="noopener" aria-label="View current ${key} photo"><img src="${mediaSrc(profilePhotos[key].media,480)}" alt="Your current ${key==='then'?'Then (2006)':'Now (2026)'} photo" loading="lazy" style="width:auto;max-width:100%;height:auto;max-height:18rem;aspect-ratio:auto;object-fit:contain"></a><figcaption>Current photo · tap to view full size</figcaption></figure>`:''}<label>${profilePhotos[key]?'Replace photo':'Choose photo'}<input type="file" name="${key}Photo" accept="image/jpeg,image/png"></label></div>`).join('');
     const more=Array.from(new Set(['country','section','professionalFocus',...Object.keys(fields)])).filter(key=>['country','section','professionalFocus','researchHighlight','interests','reunionStory','extra','prompt','printName'].includes(key));
     return `<p><a href="/people/${member.id}">Back to my profile</a></p><p>Complete the essentials to unlock memories, WhatsApp Insights and incoming catch-up names. Write a few sentences for the story questions so your batchmates can catch up with you. Highlighted items are still needed; you can save your progress at any time.</p>`+
       form('/profile',field('profile_form','all')+
