@@ -5,6 +5,24 @@ import { readdirSync, readFileSync } from 'node:fs';
 import worker from '../worker.mjs';
 import { profileMemoryRows } from '../views.mjs';
 
+test('profile editor previews imported photos and prioritizes uploaded replacements',async()=>{
+ const {call,session,sqlite}=fixture();const cookie=await session(2,'bbbb');
+ sqlite.prepare('INSERT OR REPLACE INTO yearbook_public VALUES(?,?,?)').run(2,'{}',JSON.stringify([{submission:'self-2',key:'legacy.jpg'}]));
+ let html=await body(await call('/profile',cookie));
+ assert.match(html,/src="\/media\/yearbook\/2\/0\?w=480"/);
+ assert.match(html,/alt="Your current Then \(2006\) photo"/);
+ assert.doesNotMatch(html,/alt="Your current Now/);
+ sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,'thenPhotoObject','replacement.jpg');
+ sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,'nowPhotoObject','now.jpg');
+ html=await body(await call('/profile',cookie));
+ assert.match(html,/src="\/media\/profile-photo\/2\/then\?w=480"/);
+ assert.match(html,/src="\/media\/profile-photo\/2\/now\?w=480"/);
+ assert.doesNotMatch(html,/src="\/media\/yearbook\/2\/0[^>]*alt="Your current Then/);
+ const editor=html.match(/<form method="post" action="\/profile"[\s\S]*?<\/form>/)[0];
+ assert.equal((editor.match(/type="submit"/g)||[]).length,1);
+ assert.match(html,/Current photo · tap to view full size/);
+});
+
 test('photo-tag projections deduplicate photos and preserve album associations',()=>{
  const post={id:'album',author:1,profile_album_tag:0,album_cover:'b',album_title:'Trip',collage_photos:JSON.stringify(['post/a','post/b']),profile_photo_links:JSON.stringify([
   {media:'post/b',kind:'person',href:'/people/2',label:'Tagged'},
