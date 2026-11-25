@@ -5,6 +5,22 @@ import { readdirSync, readFileSync } from 'node:fs';
 import worker from '../worker.mjs';
 import { profileMemoryRows } from '../views.mjs';
 
+test('section is visible beside dorm, prefills and saves to profile and directory',async()=>{
+ const {call,session,sqlite}=fixture();const cookie=await session(2,'bbbb');
+ sqlite.prepare('INSERT INTO roster_sections VALUES(?,?)').run(2,'B');
+ let editor=await body(await call('/profile',cookie));
+ assert.match(editor,/name="section" value="B"/);
+ assert.ok(editor.indexOf('name="section"')<editor.indexOf('More profile details and settings'));
+ assert.equal((editor.match(/name="section"/g)||[]).length,1);
+ const response=await call('/profile',cookie,{profile_form:'all',section:'c'});
+ assert.equal(response.status,303);
+ assert.equal(sqlite.prepare('SELECT section FROM roster_sections WHERE member=2').get().section,'C');
+ editor=await body(await call('/profile',cookie));assert.match(editor,/name="section" value="C"/);
+ assert.match(await body(await call('/people/2',cookie)),/Section C/);
+ assert.match(await body(await call('/people?section=C',cookie)),/Test Classmate/);
+ assert.doesNotMatch(await body(await call('/people?section=B',cookie)),/>Test Classmate<\/strong>/);
+});
+
 test('profile editor previews imported photos and prioritizes uploaded replacements',async()=>{
  const {call,session,sqlite}=fixture();const cookie=await session(2,'bbbb');
  sqlite.prepare('INSERT OR REPLACE INTO yearbook_public VALUES(?,?,?)').run(2,'{}',JSON.stringify([{submission:'self-2',key:'legacy.jpg'}]));
