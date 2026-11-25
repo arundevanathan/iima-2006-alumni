@@ -180,7 +180,8 @@ async function route(req, env, record, setViewer) {
     if (member) return redirect(destination(u.searchParams.get('next')));
     return signInPage(Number(u.searchParams.get('id')),destination(u.searchParams.get('next')),
       u.searchParams.get('link')==='missing' ? 'This sign-in link is incomplete. Request a new link below.' :
-      u.searchParams.get('signed-out')==='1' ? 'You’re signed out.' : '');
+      u.searchParams.get('signed-out')==='1' ? 'You’re signed out.' :
+      u.searchParams.get('moved')==='yearbook' ? 'The yearbook has moved to our new batch site.' : '');
   }
   if (path === '/request-link' && post) {
     const f = await data(), key = Number(f.get('id'));
