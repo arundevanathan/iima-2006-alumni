@@ -57,6 +57,37 @@ function fixture() {
 }
 async function body(response) { const text=await response.text(); assert.equal(response.status,200,text); return text; }
 
+test('fresh profiles require all seven items, record first completion and preserve ordering',async()=>{
+ const {call,session,sqlite}=fixture();
+ const ck=await session(2,'bbbb');
+ sqlite.exec(`
+   INSERT INTO yearbook_public VALUES(1,'{"city":"Mumbai","life":"Admin life","family":"Family"}','[]');
+   INSERT INTO profile_fields VALUES(1,'thenPhotoObject','admin-then.jpg'),(1,'nowPhotoObject','admin-now.jpg');
+   INSERT INTO profile_fields VALUES(2,'city','Bangalore'),(2,'life','A new chapter'),(2,'family','Family'),(2,'thenPhotoObject','then.jpg');
+ `);
+ let html=await body(await call('/',ck));
+ let section=html.match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
+ assert.match(section,/Test Admin/);assert.doesNotMatch(section,/Test Classmate|Completed today/);
+ assert.ok(html.indexOf('id="fresh-profiles-title"')<html.indexOf('class="meet-banner"'));
+ assert.equal((await call('/profile',ck,{field:'city',value:'Pune'})).status,303);
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM settings WHERE key='profile_completed:2'").get().n,0);
+ sqlite.exec("INSERT INTO profile_fields VALUES(2,'nowPhotoObject','now.jpg')");
+ assert.equal((await call('/profile',ck,{field:'city',value:'Pune'})).status,303);
+ const first=sqlite.prepare("SELECT value FROM settings WHERE key='profile_completed:2'").get().value;
+ html=await body(await call('/',ck));
+ section=html.match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
+ assert.ok(section.indexOf('Test Classmate')<section.indexOf('Test Admin'));
+ assert.match(section,/Pune/);assert.match(section,/Completed today/);
+ await call('/profile',ck,{field:'family',value:''});
+ section=(await body(await call('/',ck))).match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
+ assert.doesNotMatch(section,/Test Classmate/);
+ await call('/profile',ck,{field:'family',value:'Family again'});
+ assert.equal(sqlite.prepare("SELECT value FROM settings WHERE key='profile_completed:2'").get().value,first);
+ sqlite.exec('UPDATE members SET suspended=1 WHERE id=1');
+ section=(await body(await call('/',ck))).match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
+ assert.doesNotMatch(section,/Test Admin/);
+});
+
 test('current interactions and feed',async()=>{
  const {call,session,sqlite}=fixture();
  const cookie=await session(2,'bbbb');

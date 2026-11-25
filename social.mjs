@@ -37,9 +37,9 @@ export const socialScript = String.raw`
     if(location.hash.startsWith('#reunion-details')||location.hash.startsWith('#reunion-children'))reunionDetails.open=true;
     document.querySelector('[data-reunion-details-open]')?.addEventListener('click',()=>{reunionDetails.open=true;});
   }
-  const strip=document.querySelector('[data-classmate-strip]');
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
-  if(strip && !reducedMotion.matches){
+  for(const strip of document.querySelectorAll('[data-classmate-strip]')){
+   if(!reducedMotion.matches){
     let visible=false, stopped=false, frame=0, last=0, position=0, direction=1;
     const stop=()=>{
       stopped=true;
@@ -74,6 +74,7 @@ export const socialScript = String.raw`
     for(const event of ['pointerdown','wheel','focusin'])strip.addEventListener(event,stop,{once:true,passive:true});
     reducedMotion.addEventListener('change',stop,{once:true});
     document.addEventListener('visibilitychange',sync);
+   }
   }
   const feed=document.querySelector('[data-feed]');
   const cards=feed?[...feed.querySelectorAll('.collage-card')]:[];

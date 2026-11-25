@@ -39,6 +39,11 @@ const classmate = (row,extra=[]) => {
   const registry = [row.dorm&&dormLabel(row.dorm),...extra].filter(Boolean).join(' · ');
   return `<strong>${e(row.name)}</strong>${row.nickname?`<small class="nickname">“${e(row.nickname)}”</small>`:''}${registry?`<small class="registry">${e(registry)}</small>`:''}`;
 };
+const completionLabel = timestamp => {
+  const day=value=>Math.floor((value+19800000)/86400000);
+  const days=Math.max(0,day(Date.now())-day(Number(timestamp)));
+  return days===0?'Completed today':days===1?'Completed yesterday':`Completed ${days} days ago`;
+};
 // Catch-up requests reveal the sender to the recipient and can be accepted.
 const checkIcon = '<svg class="icon-inline" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6"/></svg>', extIcon = '<svg class="icon-inline icon-ext" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
 export const themeSwitch = (cls='') => `<form method="post" action="/theme" class="theme-switch ${cls}"><button type="submit" aria-label="Switch between dark and light mode"><span class="to-light">☀ Light mode</span><span class="to-dark">☾ Dark mode</span></button></form>`;
@@ -197,12 +202,15 @@ export const page={
         button.disabled=false;
       }
     });`,
-  home(rows,people,next,key,me,meet={available:false},unlock=[]){
+  home(rows,people,next,key,me,meet={available:false},unlock=[],fresh=[]){
     return `<div class="alumni-home"><section class="campus-hero"><div>
       <p class="class-label">IIM Ahmedabad · Class of 2006</p><h1 class="reunion-title" aria-label="${reunionTitle}">${titleCreative()}</h1>
       <p class="hero-lede">Twenty years since LKP. Find your batchmates, trade the old stories, and see you in Jaipur.</p>
       <div class="hero-actions"><a class="cta cta-primary" href="/compose" data-compose-open>Share a memory</a><a class="cta cta-quiet" href="/people/${me}">Edit profile</a></div>
       </div>${countdown()?`<a class="seal-link" href="/reunion">${countdown()}</a>`:''}</section>
+      <section class="home-classmates home-fresh" aria-labelledby="fresh-profiles-title"><div class="section-head"><h2 id="fresh-profiles-title">Freshly completed profiles</h2>${link('/people','See all')}</div>
+        ${fresh.length?`<div class="people-grid" role="region" aria-label="Freshly completed profiles. Scroll to browse classmates" data-classmate-strip tabindex="0">${fresh.map(row=>`<a class="person-tile" href="/people/${row.id}">${portrait(row,true,256)}<div>${classmate(row,row.city?[row.city]:[])}${row.completed_at?`<small class="completed-label">${completionLabel(row.completed_at)}</small>`:''}</div></a>`).join('')}</div>`:'<p class="fresh-empty">Completed profiles will appear here. Be one of the first to share your story.</p>'}
+      </section>
       ${meet.available?`<section class="meet-banner" aria-label="Looking to catch up">
         <p class="meet-count">${meetCountLine(meet.count)}</p>
         <div class="meet-mine">${meet.picked.length?`<span class="meet-faces">${meetFaces(meet.picked)}</span><span class="registry">You’ve picked ${meet.picked.length}</span>`:'<span class="meet-hint">Send a catch-up request to the WIMWIans you want to meet in Jaipur. They’ll be notified and can accept it.</span>'}

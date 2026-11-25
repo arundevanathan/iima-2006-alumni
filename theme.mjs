@@ -81,6 +81,11 @@ nav{margin:0;gap:3px;align-items:center}nav a{font-size:.86rem;padding:.48rem .6
 .home-classmates .person-tile>div{position:absolute;inset:auto 0 0;padding:.95rem .65rem .55rem;background:linear-gradient(transparent,#19120ff5)}
 .home-classmates .person-tile strong,.home-classmates .person-tile small{display:block;padding:0;color:#fff;overflow-wrap:anywhere}
 .home-classmates .person-tile small{font-size:.72rem;color:#f8e7d6}
+.home-fresh .section-head{align-items:center}
+.home-fresh .section-head h2{min-width:0;line-height:1.15}
+.home-fresh .section-head>a{flex-shrink:0;white-space:nowrap}
+.home-fresh .person-tile .completed-label{margin-top:.35rem;color:#e7d4a3;font-size:.67rem}
+.home-fresh .fresh-empty{color:#e6ded2;font-size:.9rem}
 .memory-collage{columns:3;column-gap:clamp(.65rem,2vw,1.25rem)}
 .memory-collage .collage-card,.memory-dialog .collage-card{break-inside:avoid;margin:0 0 1rem;padding:0;overflow:hidden;color:var(--ink);background:var(--paper);box-shadow:0 8px 24px #21181116}
 .collage-visual{position:relative}
