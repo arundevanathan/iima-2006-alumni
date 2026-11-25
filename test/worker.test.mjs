@@ -5,6 +5,35 @@ import { readdirSync, readFileSync } from 'node:fs';
 import worker from '../worker.mjs';
 import { profileMemoryRows } from '../views.mjs';
 
+test('portrait fallback prefers profile picture, Now, Then, then initials everywhere',async()=>{
+ const {call,session,sqlite}=fixture();const cookie=await session(2,'bbbb');
+ sqlite.prepare('UPDATE profile_seeds SET portrait_key=NULL WHERE roster_id=2').run();
+ const profileImage=async()=>{
+  const html=await body(await call('/people/2',cookie));
+  return html.match(/class="profile-portrait">([\s\S]*?)<\/div>/)[1];
+ };
+ assert.match(await profileImage(),/class="initials"/);
+ sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,'thenPhotoObject','then.jpg');
+ assert.match(await profileImage(),/\/media\/profile-photo\/2\/then\?w=256/);
+ sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,'nowPhotoObject','now.jpg');
+ assert.match(await profileImage(),/\/media\/profile-photo\/2\/now\?w=256/);
+ sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,'portraitObject','portrait.jpg');
+ assert.match(await profileImage(),/\/media\/portrait\/2\?w=256/);
+ sqlite.prepare("UPDATE profile_fields SET value=' ' WHERE member=2 AND field='portraitObject'").run();
+ assert.match(await profileImage(),/\/media\/profile-photo\/2\/now\?w=256/);
+ sqlite.prepare("UPDATE profile_seeds SET portrait_key='imported.jpg' WHERE roster_id=2").run();
+ assert.match(await profileImage(),/\/media\/seed\/2\?w=256/);
+ sqlite.prepare('UPDATE profile_seeds SET portrait_key=NULL WHERE roster_id=2').run();
+ sqlite.prepare("DELETE FROM profile_fields WHERE member=2 AND field IN ('nowPhotoObject','thenPhotoObject')").run();
+ sqlite.prepare('INSERT OR REPLACE INTO yearbook_public VALUES(?,?,?)').run(2,'{}',JSON.stringify([{submission:'self-2',key:'legacy.jpg'}]));
+ assert.match(await profileImage(),/\/media\/yearbook\/2\/0\?w=256/);
+ sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,'nowPhotoObject','now.jpg');
+ assert.match(await profileImage(),/\/media\/profile-photo\/2\/now\?w=256/);
+ const memory=await call('/compose',cookie,{id:crypto.randomUUID(),body:'Portrait fallback memory'});
+ assert.equal(memory.status,303);
+ for(const route of ['/','/people','/memories'])assert.match(await body(await call(route,cookie)),/\/media\/profile-photo\/2\/now\?w=/);
+});
+
 test('generated Life Lately invites owners to rewrite without adding an access requirement',async()=>{
  const {call,session,sqlite}=fixture();const owner=await session(2,'bbbb'),viewer=await session(1,'aaaa');
  let editor=await body(await call('/profile',owner));
