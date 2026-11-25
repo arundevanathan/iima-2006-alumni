@@ -294,9 +294,24 @@ async function route(req, env, record, setViewer) {
     (SELECT count(*) FROM likes l WHERE l.post=p.id AND l.member=?) AS liked,
     EXISTS(SELECT 1 FROM memory_about ma WHERE ma.post=p.id AND ma.kind='person' AND ma.target=CAST(? AS TEXT)) AS is_about_me
     FROM posts p JOIN roster r ON r.id=p.author LEFT JOIN topics t ON t.id=p.topic LEFT JOIN roster subject ON subject.id=p.subject ${seedJoin}`;
-  async function posts(where = '1', args = [], size = 25, order='p.created DESC,p.id DESC') {
-    return all(`${postQuery} WHERE ${postVisible} AND (${where}) ORDER BY ${order} LIMIT ?`,me,me,+pilot,...args,size);
+  async function posts(where = '1', args = [], size = 25, order='p.created DESC,p.id DESC', profilePerson=null) {
+    let query=postQuery;
+    if(profilePerson!==null){
+      const key=Number(profilePerson);
+      if(!Number.isSafeInteger(key))throw new Error('Invalid profile');
+      const projection=`(
+        p.subject=${key} OR EXISTS(SELECT 1 FROM memory_about ma WHERE ma.post=p.id AND ma.kind='person' AND ma.target=CAST(${key} AS TEXT))
+        OR EXISTS(SELECT 1 FROM tags t WHERE t.post=p.id AND t.member=${key} AND t.status='accepted')
+      ) AS profile_album_tag,
+      (SELECT json_group_array(json_object('media',media,'kind',kind,'href',href,'label',label)) FROM (
+        SELECT pt.media,pt.kind,'/people/'||r.id AS href,r.name AS label FROM photo_tags pt JOIN roster r ON r.id=pt.target WHERE pt.post=p.id AND pt.kind='person'
+        UNION ALL SELECT pt.media,pt.kind,'/topics/'||t.id,t.title FROM photo_tags pt JOIN topics t ON t.id=pt.target WHERE pt.post=p.id AND pt.kind='topic' AND t.hidden=0 AND t.redirect IS NULL
+      )) AS profile_photo_links,`;
+      query=query.replace('SELECT p.*,','SELECT p.*,'+projection);
+    }
+    return all(`${query} WHERE ${postVisible} AND (${where}) ORDER BY ${order} LIMIT ?`,me,me,+pilot,...args,size);
   }
+  const profileMemories=key=>posts(`p.author=? OR EXISTS(SELECT 1 FROM (SELECT ? AS id) subject_ref WHERE ${aboutPerson('subject_ref.id')} AND NOT EXISTS(SELECT 1 FROM muted_subjects m WHERE m.post=p.id)) OR EXISTS(SELECT 1 FROM tags t WHERE t.post=p.id AND t.member=? AND t.status='accepted') OR (EXISTS(SELECT 1 FROM photo_tags pt WHERE pt.post=p.id AND pt.kind='person' AND CAST(pt.target AS INTEGER)=?) AND NOT EXISTS(SELECT 1 FROM muted_subjects m WHERE m.post=p.id))`,[key,key,key,key],100,'p.created DESC,p.id DESC',key);
   async function gallery(person) {
     const seed = `SELECT 'seed/'||s.roster_id AS media,r.name AS caption,'/people/'||r.id AS source,s.portrait_key AS object_key
       FROM profile_seeds s JOIN roster r ON r.id=s.roster_id WHERE ${visibleSeed} AND s.portrait_key IS NOT NULL AND (? IS NULL OR r.id=?)`;
@@ -506,8 +521,8 @@ async function route(req, env, record, setViewer) {
       all(`SELECT field,value,source FROM selected_profile_fields WHERE member=? AND pilot_only<=?
         AND field NOT IN ('thenPhotoObject','nowPhotoObject') ORDER BY priority`,key,+pilot),
       one('SELECT section FROM roster_sections WHERE member=?',key),
-      gallery(key),
-      posts(`p.author=? OR EXISTS(SELECT 1 FROM (SELECT ? AS id) subject_ref WHERE ${aboutPerson('subject_ref.id')} AND NOT EXISTS(SELECT 1 FROM muted_subjects m WHERE m.post=p.id)) OR EXISTS(SELECT 1 FROM tags t WHERE t.post=p.id AND t.member=? AND t.status='accepted')`,[key,key,key]),
+      Promise.resolve([]),
+      profileMemories(key),
       all(`SELECT ph.slot,'yearbook/'||y.member||'/'||j.key AS media,ph.caption
         FROM yearbook_public y,json_each(y.images) j
         JOIN photos ph ON ph.submission=json_extract(j.value,'$.submission') AND ph.object_key=json_extract(j.value,'$.key')
@@ -600,7 +615,9 @@ async function route(req, env, record, setViewer) {
   }
   if (path==='/gallery') {
     const personId = u.searchParams.has('person') ? Number(u.searchParams.get('person')) : null;
-    return show('Gallery',page.gallery(await gallery(personId)));
+    if(personId!==null&&(!Number.isSafeInteger(personId)||personId<1))return invalid('Choose a classmate.');
+    const [photos,memories]=await Promise.all([gallery(personId),personId===null?posts('1',[],100):profileMemories(personId)]);
+    return show('Gallery',page.gallery(photos.filter(photo=>!photo.source.startsWith('/posts/')),memories,personId));
   }
   if (path==='/topics') {
     const q = (u.searchParams.get('q')||'').slice(0,100);
