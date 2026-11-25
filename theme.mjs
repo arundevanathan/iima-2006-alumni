@@ -924,4 +924,14 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
   .reunion-details-panel>summary h2{font-size:1.2rem}
   .reunion-details-panel>summary>span{font-size:.8rem;max-width:9rem}
 }
+
+.reunion-agenda-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:.75rem;list-style:none;margin:0;min-height:44px;cursor:pointer}
+.reunion-agenda-panel>summary::-webkit-details-marker{display:none}
+.reunion-agenda-panel>summary h2{margin:0}
+.reunion-agenda-panel>summary>span{font-size:.875rem;color:var(--muted);margin-left:auto;text-align:right}
+.reunion-agenda-panel>summary::after{content:'+';font-size:1.4rem;color:var(--brick)}
+.reunion-agenda-panel[open]>summary::after{content:'−'}
+.reunion-agenda-panel[open]>summary{margin-bottom:1rem}
+#reunion-agenda{scroll-margin-top:80px}
+@media(max-width:650px){.reunion-agenda-panel>summary{flex-wrap:wrap;gap:.4rem}.reunion-agenda-panel>summary h2{font-size:1.2rem}.reunion-agenda-panel>summary>span{font-size:.8rem}}
 `;
