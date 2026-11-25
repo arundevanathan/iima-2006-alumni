@@ -194,8 +194,9 @@ test('featured cards and comment controls',async()=>{
  const {call,session}=fixture();
  const ck=await session(1,'aaaa');
  const home=await body(await call('/',ck));
- assert.match(home,/What are they up to\?/);
- assert.equal((home.match(/class="person-tile"/g)||[]).length,1);
+ assert.match(home,/Freshly completed profiles/);
+ assert.doesNotMatch(home,/What are they up to\?/);
+ assert.equal((home.match(/class="person-tile"/g)||[]).length,0);
  const profile=await body(await call('/people/2',ck));
  assert.match(profile,/Add a memory about this classmate/);
  const created=await call('/compose',ck,{id:crypto.randomUUID(),body:'Campus',about:'person:2'});
@@ -211,12 +212,14 @@ test('featured cards and comment controls',async()=>{
  await call(path,ck,{action:'delete-comment',comment:result[0].id});
  assert.equal((await (await call(path+'?panel=comments',ck)).json()).length,0);
 });
-test('directory and reunion resolve and home features up to twelve submitters',async()=>{
+test('directory and reunion resolve and home features up to twelve completed profiles',async()=>{
  const {call,session,sqlite}=fixture();
  const ck=await session(1,'aaaa');
  for(let id=3;id<=15;id++){
-  sqlite.prepare('INSERT INTO roster VALUES(?,?,?,?)').run(id,'Classmate '+id,'D3','');
+  sqlite.prepare('INSERT INTO roster VALUES(?,?,?,?)').run(id,'Classmate '+id,'D3','Nick');
   sqlite.prepare("INSERT INTO submissions(id,subject,contributor,kind,payload) VALUES(?,?,?,'self','{}')").run('self-'+id,id,id);
+  for(const [field,value] of Object.entries({city:'Pune',life:'My story',family:'Family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))
+   sqlite.prepare('INSERT INTO profile_fields VALUES(?,?,?)').run(id,field,value);
  }
  const home=await body(await call('/',ck));
  assert.match(home,/<a href="\/people">Classmates<\/a>/);

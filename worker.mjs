@@ -444,9 +444,7 @@ async function route(req, env, record, setViewer) {
     return json([...people,...topics,...suggestions.filter(x=>!topics.some(t=>t.label.toLowerCase()===x.label.toLowerCase()))]);
   }
   if (path==='/') {
-    const [{rows,next},people,meet,unlock,fresh] = await Promise.all([feed(9,true),all(`SELECT r.id,r.name,r.dorm,r.nickname,${portrait} AS portrait FROM roster r ${seedJoin}
-      WHERE EXISTS(SELECT 1 FROM submissions y WHERE y.subject=r.id AND y.contributor=r.id AND y.kind='self')
-      ORDER BY random() LIMIT 12`,+pilot),meetSummary(),whatsappCompletion(),
+    const [{rows,next},meet,unlock,fresh] = await Promise.all([feed(9,true),meetSummary(),whatsappCompletion(),
       all(`${completedProfilesCTE}
         SELECT r.id,r.name,r.dorm,r.nickname,c.city,c.life,${portrait} AS portrait,
           pc.completed_at,pc.basis AS completion_basis
@@ -454,7 +452,7 @@ async function route(req, env, record, setViewer) {
         LEFT JOIN profile_completion pc ON pc.member=r.id
         WHERE NOT EXISTS(SELECT 1 FROM members m WHERE m.id=r.id AND m.suspended=1)
         ORDER BY coalesce(pc.completed_at,pc.observed_at,0) DESC,pc.observed_order DESC,r.name LIMIT 12`,+pilot,+pilot)]);
-    return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet,unlock,fresh),member,{home:true,active:'/'});
+    return render('Kal • Aaj • Aur Kal',page.home(rows,next,id(),me,meet,unlock,fresh),member,{home:true,active:'/'});
   }
   if (path==='/people' || path==='/reunion') {
   const completeness = `(2 * EXISTS(SELECT 1 FROM yearbook_public y WHERE y.member=r.id AND (y.fields<>'{}' OR y.images<>'[]'))
