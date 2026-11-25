@@ -537,7 +537,7 @@ async function route(req, env, record, setViewer) {
       if (field.field==='section' && field.source==='selected_enrichment' && section) continue;
       details[field.field]=field.value;
     }
-    return render(row.name,page.person({...row,linkedin:imported['LinkedIn URL'],profileLinks:imported['Profile links']},attendanceNames[key===me?row.own_attendance:row.status],details,photos,stories,me,pilot,id(),Object.fromEntries(profilePhotos.map(photo=>[photo.slot,photo])),meet),member,{home:true,active:'/people'});
+    return render(row.name,page.person({...row,lifeGenerated:!!String(details.life||'').trim()&&selected.filter(item=>item.field==='life').at(-1)?.source==='selected_enrichment',linkedin:imported['LinkedIn URL'],profileLinks:imported['Profile links']},attendanceNames[key===me?row.own_attendance:row.status],details,photos,stories,me,pilot,id(),Object.fromEntries(profilePhotos.map(photo=>[photo.slot,photo])),meet),member,{home:true,active:'/people'});
   }
 
   if (path==='/profile') {
@@ -557,6 +557,7 @@ async function route(req, env, record, setViewer) {
         if(item.field==='section'&&item.source==='selected_enrichment'&&roster.section)continue;
         values[item.field]=item.value;
       }
+      values._lifeGenerated=!!String(values.life||'').trim()&&fields.filter(item=>item.field==='life').at(-1)?.source==='selected_enrichment';
       return show('Edit profile',page.editProfile(values,member,checks,Object.fromEntries(photos.map(photo=>[photo.slot,photo]))));
     }
     const f = await data();
