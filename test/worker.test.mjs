@@ -736,7 +736,8 @@ test('reunion details collapse when complete and stay open when incomplete or ju
  html=await body(await call('/reunion',ck));assert.match(html,/<details class="reunion-details-panel">/);assert.doesNotMatch(html,/<details class="reunion-details-panel" open>/);
  assert.ok(html.indexOf('id="reunion-agenda"')<html.indexOf('id="reunion-details"'));
  assert.ok(html.indexOf('id="reunion-details"')<html.indexOf('id="reunion-attendees"'));
- assert.match(html,/<details class="reunion-agenda-panel">/);
+ assert.doesNotMatch(html,/<details class="reunion-agenda-panel"/);
+ assert.match(html,/<section class="reunion-section" id="reunion-agenda"><h2>Reunion agenda<\/h2>/);
  assert.match(html,/data-reunion-details-open/);
  html=await body(await call('/reunion?saved=1',ck));assert.match(html,/<details class="reunion-details-panel" open>/);
  assert.match(html,/srcset="[^"]*w=480/);
