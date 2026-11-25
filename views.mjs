@@ -468,17 +468,21 @@ export const page={
   },
   editProfile(fields,member,checks=[]){
     const required=['dorm','nickname','city','life','family'],optional=['company','education'];
-    const rows=keys=>keys.map(k=>`<div id="profile-field-${k}" class="${required.includes(k)&&!String(fields[k]||'').trim()?'profile-required-missing':''}">${required.includes(k)?'<small>Required to unlock</small>':''}${profileControl(k,k,fields[k])}${checkbox('hide_'+k,'Hide '+labelFor(k),fields[k]==='')}</div>`).join('');
-    const answer=(key,label=labelFor(key),control=profileControl('value',key,fields[key]))=>`<div id="profile-field-${key}">${form('/profile',field('field',key)+control,'Save '+label)}</div>`;
-    return `<p><a href="/people/${member.id}">Back to my profile</a></p><p>Complete the essentials to unlock memories, WhatsApp Insights and incoming catch-up names. Write a few sentences for the story questions so your batchmates can catch up with you. Hiding a required detail keeps access locked.</p>`+
-      form('/profile','<fieldset><legend>The essentials · 5 required details</legend>'+rows(required)+'</fieldset><section class="panel"><h2>Your work and studies</h2><p>Add these if you’d like to share more.</p>'+rows(optional)+'</section>'+checkbox('attendance_private','Hide my attendance status',!!member.attendance_private),'Save profile')+
-      `<section class="panel"><h2>Then / Now · 2 required photos</h2><p>Choose a photo from your WIMWI days and one from your life today.</p>${['then','now'].map(key=>`<div id="profile-field-${key}"><h3>${key==='then'?'Then photo (2006)':'Now photo (2026)'}</h3><small>${checks.find(item=>item.key===key)?.complete?'Photo added · choose a file to replace it':'Required to unlock'}</small><form action="/profile" method="post" enctype="multipart/form-data">${field('field',key+'PhotoObject')}<label>Choose photo<input type="file" name="photo" accept="image/jpeg,image/png" required></label><button type="submit">Save ${key} photo</button></form></div>`).join('')}</section>`+
-      `<section class="panel" id="a-little-more-you">${moreYouIntro}${['outsideWork','moment','firstDayAdvice','anythingElse'].map(key=>answer(key)).join('')}</section>`+
-      `<details class="panel"><summary>More profile details and settings</summary>${answer('displayName','name',input('value','Name',fields.displayName||member.name,'maxlength="120"'))}
-      <h3>Profile picture</h3><form action="/profile" method="post" enctype="multipart/form-data">${field('field','portraitObject')}<label>Choose photo<input type="file" name="photo" accept="image/jpeg,image/png" required></label><button type="submit">Save profile picture</button></form>
-      ${answer('attendance','attendance',select('value','Reunion attendance',[['unknown','Choose an option'],['attending','Attending'],['declined','Not attending']],member.own_attendance||''))}
-      ${Array.from(new Set(['country','section','professionalFocus',...Object.keys(fields)])).filter(key=>!required.includes(key)&&!optional.includes(key)&&!['displayName','outsideWork','moment','firstDayAdvice','anythingElse','attendance'].includes(key)&&!key.endsWith('Object')&&['country','section','professionalFocus','researchHighlight','interests','reunionStory','extra','prompt','printName'].includes(key)).map(key=>answer(key)).join('')}</details>`;
-
+    const missing=key=>!checks.find(item=>item.key===key)?.complete;
+    const rows=keys=>keys.map(key=>`<div id="profile-field-${key}" class="${required.includes(key)&&missing(key)?'profile-required-missing':''}">${required.includes(key)?'<small>Required to unlock</small>':''}${profileControl(key,key,fields[key])}${required.includes(key)||optional.includes(key)?checkbox('hide_'+key,'Hide '+labelFor(key),fields[key]===''):''}</div>`).join('');
+    const photos=['then','now'].map(key=>`<div id="profile-field-${key}" class="${missing(key)?'profile-required-missing':''}"><h3>${key==='then'?'Then photo (2006)':'Now photo (2026)'}</h3><small>${missing(key)?'Required to unlock':'Photo added · choose a file to replace it'}</small><label>Choose photo<input type="file" name="${key}Photo" accept="image/jpeg,image/png"></label></div>`).join('');
+    const more=Array.from(new Set(['country','section','professionalFocus',...Object.keys(fields)])).filter(key=>['country','section','professionalFocus','researchHighlight','interests','reunionStory','extra','prompt','printName'].includes(key));
+    return `<p><a href="/people/${member.id}">Back to my profile</a></p><p>Complete the essentials to unlock memories, WhatsApp Insights and incoming catch-up names. Write a few sentences for the story questions so your batchmates can catch up with you. Highlighted items are still needed; you can save your progress at any time.</p>`+
+      form('/profile',field('profile_form','all')+
+      '<fieldset><legend>The essentials · 5 required details</legend>'+rows(required)+'</fieldset>'+
+      '<section class="panel"><h2>Then / Now · 2 required photos</h2><p>Choose a photo from your WIMWI days and one from your life today. Existing photos stay unless you choose replacements.</p>'+photos+'</section>'+
+      '<section class="panel"><h2>Your work and studies</h2><p>Add these if you’d like to share more.</p>'+rows(optional)+'</section>'+
+      `<section class="panel" id="a-little-more-you">${moreYouIntro}${rows(['outsideWork','moment','firstDayAdvice','anythingElse'])}</section>`+
+      `<details class="panel"><summary>More profile details and settings</summary><div id="profile-field-displayName">${input('displayName','Name',fields.displayName||member.name,'maxlength="120"')}</div>
+      <h3>Profile picture</h3><label>Choose photo<input type="file" name="portraitPhoto" accept="image/jpeg,image/png"></label>
+      ${select('attendance','Reunion attendance',[['unknown','Choose an option'],['attending','Attending'],['declined','Not attending']],fields.attendance||'unknown')}
+      ${rows(more)}${checkbox('attendance_private','Hide my attendance status',!!member.attendance_private)}</details>
+      <p>Your answers and selected photos will be saved together.</p>`,'Save profile','enctype="multipart/form-data"');
   },
   images,
   topics(rows,q){return `<form method="get">${input('q','Find a memory topic',q)}<button>Search</button></form><p>${link('/compose','Create a topic and add a memory')}</p>`+list(rows.map(r=>link('/topics/'+r.id,r.title)+' '+badge(r.kind)),'No topics yet.');},
