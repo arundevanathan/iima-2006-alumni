@@ -453,7 +453,7 @@ async function route(req, env, record, setViewer) {
         FROM completed_profiles c JOIN roster r ON r.id=c.id ${seedJoin}
         LEFT JOIN profile_completion pc ON pc.member=r.id
         WHERE NOT EXISTS(SELECT 1 FROM members m WHERE m.id=r.id AND m.suspended=1)
-        ORDER BY coalesce(pc.completed_at,pc.observed_at,0) DESC,pc.observed_order DESC,r.name LIMIT 6`,+pilot,+pilot)]);
+        ORDER BY coalesce(pc.completed_at,pc.observed_at,0) DESC,pc.observed_order DESC,r.name LIMIT 12`,+pilot,+pilot)]);
     return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet,unlock,fresh),member,{home:true,active:'/'});
   }
   if (path==='/people' || path==='/reunion') {

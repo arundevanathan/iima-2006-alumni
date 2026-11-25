@@ -86,6 +86,13 @@ nav{margin:0;gap:3px;align-items:center}nav a{font-size:.86rem;padding:.48rem .6
 .home-fresh .section-head>a{flex-shrink:0;white-space:nowrap}
 .home-fresh .person-tile .completed-label{margin-top:.35rem;color:#e7d4a3;font-size:.67rem}
 .home-fresh .fresh-empty{color:#e6ded2;font-size:.9rem}
+.home-fresh .people-grid{grid-template-columns:none;scrollbar-width:thin;scrollbar-color:#f3c9b870 transparent}
+.home-fresh .people-grid::-webkit-scrollbar{display:block;height:3px}
+.home-fresh .people-grid::-webkit-scrollbar-thumb{background:#f3c9b870;border-radius:3px}
+.fresh-browse{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin:.1rem 0 .5rem;font-size:.75rem;color:#e6ded2}
+.fresh-browse>div{display:flex;gap:.4rem}
+.fresh-browse button{display:grid;place-items:center;width:36px;min-height:32px;margin:0;padding:0;border:1px solid #ffffff40;border-radius:8px;background:#ffffff0c;color:#fff;font-size:1rem}
+.fresh-browse button:disabled{opacity:.3;cursor:default}
 .memory-collage{columns:3;column-gap:clamp(.65rem,2vw,1.25rem)}
 .memory-collage .collage-card,.memory-dialog .collage-card{break-inside:avoid;margin:0 0 1rem;padding:0;overflow:hidden;color:var(--ink);background:var(--paper);box-shadow:0 8px 24px #21181116}
 .collage-visual{position:relative}

@@ -38,6 +38,23 @@ export const socialScript = String.raw`
     document.querySelector('[data-reunion-details-open]')?.addEventListener('click',()=>{reunionDetails.open=true;});
   }
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+  // Keep new completions at the start until the reader chooses to browse.
+  const freshStrip=document.querySelector('[data-fresh-strip]');
+  if(freshStrip){
+    const controls=[...freshStrip.parentElement.querySelectorAll('[data-fresh-step]')];
+    const update=()=>{
+      const end=freshStrip.scrollWidth-freshStrip.clientWidth;
+      for(const button of controls)button.disabled=Number(button.dataset.freshStep)<0?freshStrip.scrollLeft<=1:freshStrip.scrollLeft>=end-1;
+    };
+    const reset=()=>{freshStrip.scrollLeft=0;update();};
+    const step=direction=>freshStrip.scrollBy({left:direction*freshStrip.clientWidth*.85,behavior:reducedMotion.matches?'instant':'smooth'});
+    for(const button of controls)button.addEventListener('click',()=>step(Number(button.dataset.freshStep)));
+    freshStrip.addEventListener('scroll',update,{passive:true});
+    freshStrip.addEventListener('keydown',event=>{if(event.target===freshStrip&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();step(event.key==='ArrowRight'?1:-1);}});
+    window.addEventListener('resize',update,{passive:true});
+    window.addEventListener('pageshow',reset);
+    reset();
+  }
   for(const strip of document.querySelectorAll('[data-classmate-strip]')){
    if(!reducedMotion.matches){
     let visible=false, stopped=false, frame=0, last=0, position=0, direction=1;
