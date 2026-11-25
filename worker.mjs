@@ -1,4 +1,4 @@
-import { render, signIn, page, form, field, escape, whatsappRequirements, whatsappUnlock } from './views.mjs';
+import { render, signIn, page, form, field, escape, whatsappRequirements, whatsappUnlock, reunionCatchups } from './views.mjs';
 import { fonts } from './fonts.mjs';
 import { whatsappRoute } from './whatsapp.mjs';
 import { completedProfilesCTE } from './completion.mjs';
@@ -466,9 +466,10 @@ async function route(req, env, record, setViewer) {
       }
       return new Response('Your reunion details changed. Reload the page and try again.',{status:409});
     }
-    const section = reunion?'':(u.searchParams.get('section')||'').trim().slice(0,20);
+    const section = (u.searchParams.get('section')||'').trim().slice(0,20);
+    const catchup = reunion && ['confirmed','requested','incoming','outgoing','none'].includes(u.searchParams.get('catchup')) ? u.searchParams.get('catchup') : '';
     const dorms = await all("SELECT DISTINCT dorm FROM roster WHERE trim(dorm)<>'' ORDER BY CAST(dorm AS INTEGER),dorm");
-    const sections = reunion?[]:await all('SELECT DISTINCT section FROM roster_sections ORDER BY section');
+    const sections = await all('SELECT DISTINCT section FROM roster_sections ORDER BY section');
     const rows = await all(`SELECT r.id,r.name,r.dorm,r.nickname,rs.section,${portrait} AS portrait,
       CASE WHEN coalesce(m.attendance_private,0)=0 THEN coalesce(rt.status,a.status) END AS status
       FROM roster r LEFT JOIN members m ON m.id=r.id LEFT JOIN reunion_tracker rt ON rt.member=r.id
@@ -477,7 +478,18 @@ async function route(req, env, record, setViewer) {
       AND (?='' OR r.dorm=?) AND (?='' OR rs.section=?)
       AND (?='' OR (coalesce(m.attendance_private,0)=0 AND CASE WHEN ? THEN rt.status ELSE coalesce(rt.status,a.status) END=?))
       ORDER BY ${completeness} DESC,r.name`,+pilot,q,q,dorm,dorm,section,section,status,+reunion,status);
-    const directory = page.directory(rows,attendanceNames,q,status,dorms,dorm,reunion,sections,section);
+    let attendees=rows;
+    if(reunion){
+      const [wishes,checks]=await Promise.all([
+        all('SELECT member,target,request_id,accepted_at FROM meet_wishes WHERE member=? OR target=?',me,me),
+        whatsappCompletion()
+      ]);
+      attendees=reunionCatchups(rows,wishes,me,checks.every(check=>check.complete),catchup);
+    }
+    const returnFilters=new URLSearchParams();
+    for(const [key,value] of Object.entries({q,dorm,section,catchup}))if(value)returnFilters.set(key,value);
+    const reunionReturn='/reunion'+(returnFilters.size?'?'+returnFilters:'')+'#reunion-attendees';
+    const directory = page.directory(attendees,attendanceNames,q,status,dorms,dorm,reunion,sections,section,catchup,reunionReturn);
     if (!reunion) return show('Classmates',directory);
     const tracker = await one("SELECT * FROM reunion_tracker WHERE member=? AND status='attending'",me);
     const saved = tracker && await one('SELECT details FROM reunion_logistics WHERE member=?',me);
