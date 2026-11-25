@@ -223,6 +223,8 @@ async function route(req, env, record, setViewer) {
   }
   if (!member) return redirect('/signin?next='+encode(path+u.search));
   const me = member.id;
+  // Preserve an undated baseline for profiles already complete before this edit.
+  if (path==='/profile' && post) await recordProfileCompletion(db,me,pilot,0);
   if (path==='/tag-search' && !post) {
     const q = (u.searchParams.get('q')||'').trim().slice(0,80);
     if (q.length<2) return json([]);
@@ -445,7 +447,7 @@ async function route(req, env, record, setViewer) {
         FROM completed_profiles c JOIN roster r ON r.id=c.id ${seedJoin}
         LEFT JOIN settings st ON st.key='profile_completed:'||r.id
         WHERE NOT EXISTS(SELECT 1 FROM members m WHERE m.id=r.id AND m.suspended=1)
-        ORDER BY completed_at DESC,r.name LIMIT 6`,+pilot,+pilot)]);
+        ORDER BY coalesce(completed_at,0) DESC,r.name LIMIT 6`,+pilot,+pilot)]);
     return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet,unlock,fresh),member,{home:true,active:'/'});
   }
   if (path==='/people' || path==='/reunion') {
