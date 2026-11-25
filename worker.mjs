@@ -542,12 +542,19 @@ async function route(req, env, record, setViewer) {
 
   if (path==='/profile') {
     if (!post) {
-      const [roster,fields]=await Promise.all([
-        one('SELECT dorm,nickname FROM roster WHERE id=?',me),
-        all('SELECT field,value FROM selected_profile_fields WHERE member=? AND pilot_only<=? ORDER BY priority',me,+pilot)
+      const [roster,fields,photos,checks]=await Promise.all([
+        one('SELECT r.dorm,r.nickname,a.status AS attendance FROM roster r LEFT JOIN attendance a ON a.member=r.id WHERE r.id=?',me),
+        all('SELECT field,value FROM selected_profile_fields WHERE member=? AND pilot_only<=? ORDER BY priority',me,+pilot),
+        all(`SELECT ph.slot,'yearbook/'||y.member||'/'||j.key AS media,ph.caption
+          FROM yearbook_public y,json_each(y.images) j
+          JOIN photos ph ON ph.submission=json_extract(j.value,'$.submission') AND ph.object_key=json_extract(j.value,'$.key')
+          WHERE y.member=? AND ph.slot IN ('then','now')
+          UNION ALL SELECT substr(field,1,length(field)-11),'profile-photo/'||member||'/'||substr(field,1,length(field)-11),''
+          FROM profile_fields WHERE member=? AND field IN ('thenPhotoObject','nowPhotoObject') AND value<>''`,me,me),
+        whatsappCompletion()
       ]);
       const values={...roster};for(const item of fields)values[item.field]=item.value;
-      return show('Edit profile',page.editProfile(values,member,await whatsappCompletion()));
+      return show('Edit profile',page.editProfile(values,member,checks,Object.fromEntries(photos.map(photo=>[photo.slot,photo]))));
     }
     const f = await data();
     const inline = f.get('field');
