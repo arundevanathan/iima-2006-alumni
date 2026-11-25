@@ -4,6 +4,7 @@ compatibility_date = "2025-11-23"
 keep_vars = true
 
 [vars]
+PREVIEW_LABEL = ""
 ACCESS_MODE = "batch"
 SITE_ORIGIN = "https://iima-class-of-2006.in"
 MAIL_FROM = "IIMA Class of 2006 Batch Admin <signin@iima-class-of-2006.in>"
