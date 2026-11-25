@@ -959,4 +959,15 @@ label,.profile-facts dt,.profile-entry dt{font-weight:600}
 .reunion-agenda-panel[open]>summary{margin-bottom:1rem}
 #reunion-agenda{scroll-margin-top:80px}
 @media(max-width:650px){.reunion-agenda-panel>summary{flex-wrap:wrap;gap:.4rem}.reunion-agenda-panel>summary h2{font-size:1.2rem}.reunion-agenda-panel>summary>span{font-size:.8rem}}
+
+/* A quiet secondary action after posting a comment. */
+.collage-card button[data-comment-again]{
+  display:inline-flex;align-items:center;min-height:44px;width:auto;
+  margin:.2rem 0 0;padding:.4rem .2rem;background:transparent;
+  border:0;border-radius:var(--r-sm);box-shadow:none;
+  color:var(--brick);font:600 .85rem/1.4 var(--sans);text-align:left;
+}
+.collage-card button[data-comment-again]:hover{background:transparent;color:var(--brick-deep);text-decoration:underline;text-underline-offset:.2em}
+.collage-card button[data-comment-again]:focus-visible{outline:2px solid var(--brick-fired);outline-offset:2px}
+.collage-card button[data-comment-again][hidden]{display:none}
 `;
