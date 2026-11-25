@@ -57,6 +57,37 @@ function fixture() {
 }
 async function body(response) { const text=await response.text(); assert.equal(response.status,200,text); return text; }
 
+test('preview reuses a live admin session without sending a sign-in email',async()=>{
+ const {call,session,sqlite,env}=fixture();
+ const signedOut=await call('/preview');
+ assert.equal(signedOut.status,303);
+ assert.equal(signedOut.headers.get('location'),'/signin?next=%2Fpreview');
+ const member=await session(2,'bbbb');
+ assert.equal((await call('/preview',member)).status,403);
+ const admin=await session(1,'aaaa');
+ const handoff=await call('/preview',admin);
+ assert.equal(handoff.status,303);
+ assert.equal(handoff.headers.get('cache-control'),'no-store');
+ assert.equal(handoff.headers.get('referrer-policy'),'no-referrer');
+ const target=new URL(handoff.headers.get('location'));
+ assert.equal(target.origin,'https://staging-iima-2006-alumni.arun-devanathan.workers.dev');
+ assert.equal(target.pathname,'/verify');
+ const token=new URLSearchParams(target.hash.slice(1)).get('token');
+ assert.ok(token);
+ const row=sqlite.prepare('SELECT member,expires FROM login_links').get();
+ assert.equal(row.member,1);
+ assert.ok(row.expires>Date.now() && row.expires<=Date.now()+60000);
+ env.PREVIEW_LABEL='true';
+ assert.equal((await call('/')).headers.get('location'),'https://iima-class-of-2006.in/preview');
+ assert.equal((await call('/signin')).headers.get('location'),'https://iima-class-of-2006.in/preview');
+ const verified=await call('/verify',null,{token});
+ assert.equal(verified.status,303);
+ assert.equal(verified.headers.get('location'),'/');
+ assert.match(verified.headers.get('set-cookie'),/__Host-alumni=/);
+ assert.equal(sqlite.prepare('SELECT count(*) n FROM login_links').get().n,0);
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM site_events WHERE event='email_accepted'").get().n,0);
+});
+
 test('current interactions and feed',async()=>{
  const {call,session,sqlite}=fixture();
  const cookie=await session(2,'bbbb');
