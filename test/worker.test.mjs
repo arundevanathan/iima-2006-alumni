@@ -5,6 +5,20 @@ import { readdirSync, readFileSync } from 'node:fs';
 import worker from '../worker.mjs';
 import { profileMemoryRows } from '../views.mjs';
 
+test('generated Life Lately invites owners to rewrite without adding an access requirement',async()=>{
+ const {call,session,sqlite}=fixture();const owner=await session(2,'bbbb'),viewer=await session(1,'aaaa');
+ let editor=await body(await call('/profile',owner));
+ assert.match(editor,/This Life, Lately introduction was auto-generated/);
+ let own=await body(await call('/people/2',owner));assert.match(own,/Rewrite my introduction/);
+ assert.doesNotMatch(await body(await call('/people/2',viewer)),/Rewrite my introduction|profile-generated-review/);
+ for(const [key,value]of Object.entries({city:'Mumbai',family:'Family',thenPhotoObject:'then.jpg',nowPhotoObject:'now.jpg'}))sqlite.prepare('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)').run(2,key,value);
+ own=await body(await call('/people/2',owner));assert.match(own,/7 \/ 7/);assert.match(own,/Rewrite my introduction/);
+ await call('/profile',owner,{field:'life',value:'My own introduction'});
+ editor=await body(await call('/profile',owner));assert.doesNotMatch(editor,/This Life, Lately introduction was auto-generated/);
+ assert.match(editor,/My own introduction/);
+ own=await body(await call('/people/2',owner));assert.doesNotMatch(own,/Rewrite my introduction/);
+});
+
 test('section is visible beside dorm, prefills and saves to profile and directory',async()=>{
  const {call,session,sqlite}=fixture();const cookie=await session(2,'bbbb');
  sqlite.prepare('INSERT INTO roster_sections VALUES(?,?)').run(2,'B');
