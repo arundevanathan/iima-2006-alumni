@@ -29,6 +29,7 @@ const profileControl = (name,key,value='') => {
   const prompt=profilePrompts[key], label=prompt?.[0]||labelFor(key);
   return `<label>${e(label)}${prompt?`<small style="display:block;font-weight:400;line-height:1.5;margin:.4rem 0;text-transform:none;letter-spacing:normal">${e(prompt[1])}</small>`:''}<textarea name="${e(name)}" maxlength="4000" rows="${prompt?4:2}" style="min-height:${prompt?'7':'3.5'}rem" placeholder="${prompt?'A few sentences will help your batchmates catch up with you.':''}">${e(value)}</textarea></label>`;
 };
+const generatedLifeNote="<div class=\"profile-generated-review\" style=\"margin:.8rem 0;padding:.8rem;border:1px solid var(--brick-fired);border-radius:var(--r);background:var(--brick-wash)\"><strong>Make your introduction your own</strong><p style=\"margin:.35rem 0\">This Life, Lately introduction was auto-generated. We encourage you to rewrite it in your own words—tell your classmates what life looks like for you today.</p></div>";
 const moreYouIntro = '<h2>A little more you</h2><p>Pick one—or answer them all. These are often the best parts to read.</p>';
 
 const mediaSrc = (media,width) => `/media/${e(media)}?w=${width}`;
@@ -210,6 +211,7 @@ export function whatsappUnlock(checks, me, own=false, details={}) {
       <div class="profile-progress-heading"><h2 id="profile-progress-title">Minimum requirements completion</h2><strong>${checks.length-missing.length} / ${checks.length}</strong></div>
       <progress max="${checks.length}" value="${checks.length-missing.length}" aria-label="Minimum requirements completion"></progress>
       ${complete?'<p><strong>Your essentials are all set.</strong> Memories, WhatsApp Insights and incoming catch-up names are unlocked. Enjoy reconnecting!</p><a href="/wa/">Explore WhatsApp Insights</a>':`<p>You’re on your way. These five details and two photos unlock memories, WhatsApp Insights and the names of classmates who want to catch up with you.</p><a class="cta profile-primary" href="/profile#profile-field-${missing[0].key}">Continue your profile</a>`}
+      ${details.lifeGenerated?`${generatedLifeNote}<a href="/profile#profile-field-life">Rewrite my introduction</a>`:''}
       <details class="profile-all-requirements"><summary>${complete?'Your seven essentials':'What’s left to add?'}</summary><ul class="unlock-checklist">${checks.map(check=>`<li><span aria-hidden="true">${check.complete?'✓':'○'}</span><a href="/profile#profile-field-${check.key}">${e(check.label)}</a><small>${check.complete?'Complete':'Required'}</small></li>`).join('')}</ul></details>
     </section>
     <section class="panel profile-completion-summary" aria-labelledby="additional-progress-title">
@@ -439,7 +441,7 @@ export const page={
           </div>
         </div>
       </header>
-      ${own?whatsappUnlock(requirements,me,true,details):''}
+      ${own?whatsappUnlock(requirements,me,true,{...details,lifeGenerated:row.lifeGenerated}):''}
       ${pilot?'<p class="profile-pilot">Profiles are being checked during the pilot.</p>':''}
       <div class="profile-layout${factKeys.length||photos.length||todoKeys.length?'':' profile-layout-wide'}">
         ${factKeys.length||photos.length||todoKeys.length?`<aside class="profile-sidebar">
@@ -488,7 +490,7 @@ export const page={
   editProfile(fields,member,checks=[],profilePhotos={}){
     const required=['dorm','nickname','city','life','family'],optional=['company','education'];
     const missing=key=>!checks.find(item=>item.key===key)?.complete;
-    const rows=keys=>keys.map(key=>`<div id="profile-field-${key}" class="${required.includes(key)&&missing(key)?'profile-required-missing':''}">${required.includes(key)?'<small>Required to unlock</small>':''}${profileControl(key,key,fields[key])}${required.includes(key)||optional.includes(key)?checkbox('hide_'+key,'Hide '+labelFor(key),fields[key]===''):''}</div>`).join('');
+    const rows=keys=>keys.map(key=>`<div id="profile-field-${key}" class="${required.includes(key)&&(missing(key)||(key==='life'&&fields._lifeGenerated))?'profile-required-missing':''}">${required.includes(key)?'<small>Required to unlock</small>':''}${key==='life'&&fields._lifeGenerated?generatedLifeNote:''}${profileControl(key,key,fields[key])}${required.includes(key)||optional.includes(key)?checkbox('hide_'+key,'Hide '+labelFor(key),fields[key]===''):''}</div>`).join('');
     const photos=['then','now'].map(key=>`<div id="profile-field-${key}" class="${missing(key)?'profile-required-missing':''}"><h3>${key==='then'?'Then photo (2006)':'Now photo (2026)'}</h3><small>${missing(key)?'Required to unlock':'Photo added · choose a file to replace it'}</small>${profilePhotos[key]?`<figure style="margin:.65rem 0"><a href="/media/${e(profilePhotos[key].media)}" target="_blank" rel="noopener" aria-label="View current ${key} photo"><img src="${mediaSrc(profilePhotos[key].media,480)}" alt="Your current ${key==='then'?'Then (2006)':'Now (2026)'} photo" loading="lazy" style="width:auto;max-width:100%;height:auto;max-height:18rem;aspect-ratio:auto;object-fit:contain"></a><figcaption>Current photo · tap to view full size</figcaption></figure>`:''}<label>${profilePhotos[key]?'Replace photo':'Choose photo'}<input type="file" name="${key}Photo" accept="image/jpeg,image/png"></label></div>`).join('');
     const more=Array.from(new Set(['country','professionalFocus',...Object.keys(fields)])).filter(key=>['country','professionalFocus','researchHighlight','interests','reunionStory','extra','prompt','printName'].includes(key));
     return `<p><a href="/people/${member.id}">Back to my profile</a></p><p>Complete the essentials to unlock memories, WhatsApp Insights and incoming catch-up names. Write a few sentences for the story questions so your batchmates can catch up with you. Highlighted items are still needed; you can save your progress at any time.</p>`+
