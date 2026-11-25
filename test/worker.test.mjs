@@ -190,6 +190,36 @@ test('verification is one-time and redirects directly',async()=>{
  assert.match(await replay.text(),/Request a fresh link/);
  assert.equal(replay.headers.get('set-cookie'),null);
 });
+test('home and Memories show newest posts first with stable pagination and no photo boost',async()=>{
+ const {call,session,sqlite}=fixture();
+ const ck=await session(1,'aaaa');
+ sqlite.exec("INSERT INTO topics VALUES('hidden-topic','Hidden topic','event',1,NULL)");
+ for(let i=1;i<=18;i++){
+  const id='ordered-'+String(i).padStart(2,'0');
+  sqlite.prepare('INSERT INTO posts(id,author,body,created,hidden,topic) VALUES(?,?,?,?,?,?)')
+   .run(id,2,'Ordered memory '+i,100000+Math.floor(i/3),i===18?1:0,i===17?'hidden-topic':null);
+ }
+ sqlite.exec("INSERT INTO uploads VALUES('old-photo',2,'old.jpg','image/jpeg','old-digest','','ordered-01',100000)");
+ await call('/posts/ordered-01',ck,{action:'like',liked:'1'});
+ await call('/posts/ordered-01',ck,{action:'comment',body:'A new comment on an old memory'});
+ const posted=await call('/compose',ck,{id:crypto.randomUUID(),body:'A freshly posted memory',about:'person:2'});
+ const newId=posted.headers.get('location').split('/').at(-1);
+ const expected=[newId,...Array.from({length:16},(_,i)=>'ordered-'+String(16-i).padStart(2,'0'))];
+ const ids=html=>[...html.matchAll(/data-post="([^"]+)"/g)].map(m=>m[1]);
+ const next=html=>html.match(/data-feed-next href="([^"]+)"/)?.[1].replaceAll('&amp;','&');
+ const home=await body(await call('/',ck));
+ assert.deepEqual(ids(home),expected.slice(0,9));
+ assert.doesNotMatch(next(home),/featured|mix/);
+ const remaining=await (await call(next(home)+'&fragment=1',ck)).json();
+ assert.deepEqual([...ids(home),...ids(remaining.html)],expected);
+ for(const path of ['/memories','/memories?featured=1&mix=123','/memories?q=memory']){
+  const html=await body(await call(path,ck));
+  assert.deepEqual(ids(html),expected.slice(0,12));
+  const rest=await (await call(next(html)+'&fragment=1',ck)).json();
+  assert.deepEqual([...ids(html),...ids(rest.html)],expected);
+ }
+});
+
 test('featured cards and comment controls',async()=>{
  const {call,session}=fixture();
  const ck=await session(1,'aaaa');

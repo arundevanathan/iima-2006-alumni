@@ -341,14 +341,9 @@ async function route(req, env, record, setViewer) {
     member.portrait=profile?.portrait;
     member.unread=unread.total;
   }
-  async function feed(size, featured, q='') {
+  async function feed(size, q='') {
     const photoBonus = `CASE WHEN EXISTS(SELECT 1 FROM uploads up WHERE up.post=p.id)
       OR EXISTS(SELECT 1 FROM photos ph WHERE ph.submission=p.origin) THEN 604800000 ELSE 0 END`;
-    const suppliedSeed=u.searchParams.get('mix');
-    const mix=featured ? (/^\d{1,6}$/.test(suppliedSeed||'') ? Number(suppliedSeed) : crypto.getRandomValues(new Uint32Array(1))[0]%999983) : 0;
-    const jitter = featured ? `((p.created % 999983 + coalesce(unicode(substr(p.id,-1,1)),0)*8191
-      + coalesce(unicode(substr(p.id,-2,1)),0)*131) * ${mix+101} % 999983) * 6048` : '0';
-    const score = featured ? `(p.created+(${photoBonus})+(${jitter}))` : 'p.created';
     const before = Number(u.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
     const cursor = u.searchParams.get('cursor') || '';
     const search = `AND (instr(lower(p.body||' '||r.name||' '||r.nickname||' '||coalesce(subject.name,'')||' '||coalesce(subject.nickname,'')||' '||coalesce(t.title,'')||' '||coalesce((SELECT title FROM memory_albums WHERE post=p.id),'')),lower(?))>0
@@ -361,25 +356,13 @@ async function route(req, env, record, setViewer) {
       OR EXISTS(SELECT 1 FROM uploads a WHERE a.post=p.id AND instr(lower(a.caption),lower(?))>0)
       OR EXISTS(SELECT 1 FROM photos ph WHERE ph.submission=p.origin AND instr(lower(ph.caption),lower(?))>0)
       OR (lower(?) IN ('photo','photos') AND ((${photoBonus})>0)))`;
-    const rows = await posts(`(${score}<? OR (${score}=? AND p.id<?)) ${q?search:''}`,
-      [before,before,cursor,...(q?Array(7).fill(q):[])],size+1,`${score} DESC,p.id DESC`);
+    const rows = await posts(`(p.created<? OR (p.created=? AND p.id<?)) ${q?search:''}`,
+      [before,before,cursor,...(q?Array(7).fill(q):[])],size+1,'p.created DESC,p.id DESC');
     const more = rows.length>size;
     if (more) rows.pop();
     const last=rows.at(-1);
-    const codeAtEnd = (value,offset) => Array.from(value).at(-offset)?.codePointAt(0) ?? 0;
-    const offset = more && featured
-      ? ((last.created % 999983 + codeAtEnd(last.id,1)*8191 + codeAtEnd(last.id,2)*131) * (mix+101) % 999983)*6048
-      : 0;
-    const position = more && last.created+(featured && (last.feed_photo||last.has_legacy_photo)?604800000:0)+offset;
-    const next = more ? '/memories?before='+position+'&cursor='+encode(last.id)+(featured?'&featured=1&mix='+mix:'')+(q?'&q='+encode(q):'') : '';
-    if (!featured) return {rows,next};
-    const photos=rows.filter(row=>row.feed_photo||row.has_legacy_photo);
-    const words=rows.filter(row=>!row.feed_photo&&!row.has_legacy_photo);
-    const mixed=[];
-    while(photos.length||words.length){
-      mixed.push(...photos.splice(0,2),...words.splice(0,1));
-    }
-    return {rows:mixed,next};
+    const next = more ? '/memories?before='+last.created+'&cursor='+encode(last.id)+(q?'&q='+encode(q):'') : '';
+    return {rows,next};
   }
   // "Looking forward to meeting": tolerant of a database where migration 0014 has not run yet.
   const meetLimit = 60;
@@ -424,7 +407,7 @@ async function route(req, env, record, setViewer) {
   }
   if (path==='/memories') {
     const q=(u.searchParams.get('q')||'').trim().slice(0,100);
-    const {rows,next} = await feed(12,u.searchParams.get('featured')==='1',q);
+    const {rows,next} = await feed(12,q);
     if (u.searchParams.get('fragment')==='1') return json({html:page.memoryCards(rows),next});
     return show('Memories',page.memories(rows,next,q,id(),await whatsappCompletion(),me));
   }
@@ -444,7 +427,7 @@ async function route(req, env, record, setViewer) {
     return json([...people,...topics,...suggestions.filter(x=>!topics.some(t=>t.label.toLowerCase()===x.label.toLowerCase()))]);
   }
   if (path==='/') {
-    const [{rows,next},meet,unlock,fresh] = await Promise.all([feed(9,true),meetSummary(),whatsappCompletion(),
+    const [{rows,next},meet,unlock,fresh] = await Promise.all([feed(9),meetSummary(),whatsappCompletion(),
       all(`${completedProfilesCTE}
         SELECT r.id,r.name,r.dorm,r.nickname,c.city,c.life,${portrait} AS portrait,
           pc.completed_at,pc.basis AS completion_basis
