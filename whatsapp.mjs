@@ -78,8 +78,11 @@ html .tn{min-width:0}
 .wa-solo .wa-detail{margin:1rem 0 2rem;font-size:1.05rem;color:var(--ink-2);max-width:38rem}
 .wa-solo .cta{display:inline-block;padding:.8rem 1.2rem;background:var(--accent);color:var(--on-accent);text-decoration:none}
 body:has(.wa-solo){background:var(--page);color:var(--ink);margin:0;min-height:100vh}
-.wa-credit{max-width:1120px;margin:14px auto 0;padding:0 clamp(14px,4vw,32px);font:400 .9rem/1.5 var(--sans);color:var(--muted)}
-.wa-credit a{color:var(--accent);font-weight:650;text-decoration:underline;text-underline-offset:.18em}
+.wa-credit{max-width:1120px;margin:14px auto 0;padding:0 clamp(14px,4vw,32px);display:flex;align-items:center;flex-wrap:wrap;gap:.45rem .65rem;font:400 .9rem/1.5 var(--sans);color:var(--muted)}
+.wa-credit .wa-credit-author{display:inline-flex;align-items:center;gap:.55rem;color:var(--ink);text-decoration:none}
+.wa-credit-author img,.wa-credit-initials{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;aspect-ratio:1;object-fit:cover;border-radius:50%;background:var(--soft);color:var(--accent)}
+.wa-credit-author:hover strong{text-decoration:underline;text-underline-offset:.18em}
+.wa-credit-author:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .wa-admin{max-width:1120px;margin:12px auto 0;padding:8px 14px;border:1px dashed var(--axis);border-radius:4px;font:500 .8rem var(--mono);color:var(--muted)}
 `;
 
@@ -94,13 +97,13 @@ const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;'
 const jsonForScript = value => JSON.stringify(value).replace(/</g, '\\u003c');
 
 // Turn a kit page into a site page: site fonts and colours, the chosen theme, the site's bar, nonce-tagged scripts.
-export function skin(html, { nonce, theme, current, admin }) {
+export function skin(html, { nonce, theme, current, admin, author }) {
   const bar = `<nav class="sitebar" aria-label="IIMA ’06 WhatsApp"><div><a class="brand" href="/"><img src="/campus/logo.png" alt="">IIMA <small>Class of 2006</small></a>` +
     `<a id="navMe" href="/wa/"${current === 'me' ? ' aria-current="page"' : ''}>Your page</a>` +
     `<a id="navStory" hidden href="/wa/batch"></a>` +   // kept for the kit's script, which sets its href; never shown
     `<a class="back" href="/">Back to the site</a>${themeSwitch()}</div></nav>` +
     (admin ? `<p class="wa-admin">${escapeHtml(admin)}</p>` : '') +
-    (current === 'me' ? '<p class="wa-credit">Personalized Deep-dive by <a href="/people/88">Hari Balaji</a></p>' : '');
+    (current === 'me' ? `<div class="wa-credit"><span>A personalized deep dive by</span><a class="wa-credit-author" href="/people/88">${author?.portrait?`<img src="/media/${escapeHtml(author.portrait)}?w=96" alt="" width="36" height="36" decoding="async">`:'<span class="wa-credit-initials" aria-hidden="true">HB</span>'}<strong>Hari Balaji</strong></a></div>` : '');
   const dark = theme !== 'light';
   return html
     .replace(/<link[^>]+fonts\.(?:googleapis|gstatic)\.com[^>]*>\s*/g, '')
@@ -123,7 +126,7 @@ const normalisePhone = raw => {
   return d.length === 10 ? '+91' + d : '+' + d;
 };
 
-export async function whatsappRoute({ path, u, req, env, member, admin, all, one, render }) {
+export async function whatsappRoute({ path, u, req, env, member, admin, all, one, render, author }) {
   // Plain responses, not Response.redirect(): the site adds security headers afterwards and needs mutable headers.
   const moved = to => new Response(null, { status: 301, headers: { Location: to } });
   if (path === '/wa') return moved('/wa/');
@@ -165,7 +168,7 @@ export async function whatsappRoute({ path, u, req, env, member, admin, all, one
   const theme = /(?:^|;\s*)theme=light(?:;|$)/.test(req.headers.get('Cookie') || '') ? 'light' : 'dark';
   const page = (html, options) => {
     const nonce = crypto.randomUUID().replace(/-/g, '');
-    return new Response(skin(html, { nonce, theme, ...options }), { headers: headers({
+    return new Response(skin(html, { nonce, theme, author, ...options }), { headers: headers({
       'Content-Type': 'text/html; charset=utf-8',
       'Content-Security-Policy': `default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'nonce-${nonce}'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
     }) });
