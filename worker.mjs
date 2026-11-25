@@ -242,7 +242,7 @@ async function route(req, env, record, setViewer) {
   function whatsappCompletion() {
     return completionPromise ||= (async()=>{
     const [roster, selected, photos] = await Promise.all([
-      one('SELECT dorm,nickname FROM roster WHERE id=?',me),
+      one('SELECT r.dorm,r.nickname,a.status AS attendance FROM roster r LEFT JOIN attendance a ON a.member=r.id WHERE r.id=?',me),
       all('SELECT field,value FROM selected_profile_fields WHERE member=? AND pilot_only<=? ORDER BY priority',me,+pilot),
       all(`SELECT ph.slot FROM yearbook_public y,json_each(y.images) j
         JOIN photos ph ON ph.submission=json_extract(j.value,'$.submission') AND ph.object_key=json_extract(j.value,'$.key')
@@ -562,13 +562,40 @@ async function route(req, env, record, setViewer) {
       if (req.headers.get('Accept')==='application/json' && inline!=='displayName') return json({value});
       return redirect('/people/'+me);
     }
-    const jobs = ['life','city','company','education','dorm','family','nickname'].map(key => {
+    const keys=['life','city','company','education','dorm','family','nickname'];
+    if(f.get('profile_form')==='all')keys.push(...profileKeys,'country','section','displayName','professionalFocus','researchHighlight');
+    const jobs = [...new Set(keys)].filter(key=>f.has(key)||f.has('hide_'+key)).map(key => {
       if (f.has('hide_'+key)) return sql('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)',me,key,'');
-      const value = str(f,key);
+      const value = str(f,key,key==='displayName'?120:4000);
       return value ? sql('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)',me,key,value) : sql('DELETE FROM profile_fields WHERE member=? AND field=?',me,key);
     });
-    jobs.push(sql('UPDATE members SET attendance_private=? WHERE id=?',+f.has('attendance_private'),me));
-    await db.batch(jobs);
+    const uploads=[];
+    // Validate every selected photo before writing any profile data.
+    for(const [name,key] of [['portraitPhoto','portraitObject'],['thenPhoto','thenPhotoObject'],['nowPhoto','nowPhotoObject']]){
+      const file=f.get(name);
+      if(!(file instanceof File)||!file.size)continue;
+      const photo=file.size<=15*1024*1024&&cleanPhoto(new Uint8Array(await file.arrayBuffer()));
+      if(!photo)return invalid('Choose JPEG or PNG photos up to 15 MB each. Your changes have not been saved.');
+      uploads.push({field:key,key:'profile/'+id(),photo});
+    }
+    const attendance=f.has('attendance')?str(f,'attendance',20):null;
+    if(attendance!==null&&!Object.hasOwn(attendanceNames,attendance))return invalid('Choose an attendance status.');
+    const originals=uploads.length?await all("SELECT field,value FROM profile_fields WHERE member=? AND field IN ('portraitObject','thenPhotoObject','nowPhotoObject')",me):[];
+    const uploaded=[];
+    try{
+      for(const upload of uploads){
+        await env.MEDIA.put(upload.key,upload.photo.bytes,{httpMetadata:{contentType:upload.photo.type}});
+        uploaded.push(upload.key);
+        jobs.push(sql('INSERT OR REPLACE INTO profile_fields VALUES(?,?,?)',me,upload.field,upload.key));
+      }
+      if(attendance!==null)jobs.push(sql('INSERT INTO attendance VALUES(?,?) ON CONFLICT(member) DO UPDATE SET status=excluded.status',me,attendance));
+      jobs.push(sql('UPDATE members SET attendance_private=? WHERE id=?',+f.has('attendance_private'),me));
+      await db.batch(jobs);
+    }catch(error){
+      await Promise.allSettled(uploaded.map(key=>env.MEDIA.delete(key)));
+      throw error;
+    }
+    await Promise.allSettled(originals.filter(row=>uploads.some(upload=>upload.field===row.field)&&row.value).map(row=>env.MEDIA.delete(row.value)));
     return redirect('/people/'+me);
   }
   if (path==='/gallery') {
