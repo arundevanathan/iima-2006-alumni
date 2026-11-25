@@ -168,6 +168,8 @@ async function route(req, env, record, setViewer) {
       + (edge?chars.slice(-edge).join(''):'') + '@' + domain : '';
     return signIn({selected, maskedEmail, next, mailHelp, feedback});
   };
+  if (!post && !member && env.PREVIEW_LABEL && (path==='/' || path==='/signin'))
+    return redirect('https://iima-class-of-2006.in/preview',{'Cache-Control':'no-store'});
   if (!post && (path === '/signin' || (!member && path === '/'))) {
     if (member) return redirect(destination(u.searchParams.get('next')));
     return signInPage(Number(u.searchParams.get('id')),destination(u.searchParams.get('next')),
@@ -223,6 +225,14 @@ async function route(req, env, record, setViewer) {
   }
   if (!member) return redirect('/signin?next='+encode(path+u.search));
   const me = member.id;
+  if (path==='/preview' && !post) {
+    if (env.PREVIEW_LABEL) return redirect('/');
+    if (member.role!=='admin') return new Response('Preview access is limited to batch admins.',{status:403});
+    const raw=id()+id();
+    await run('INSERT INTO login_links VALUES(?,?,?,?)',await hash(raw),me,now()+60000,'/');
+    return redirect('https://staging-iima-2006-alumni.arun-devanathan.workers.dev/verify#token='+raw,
+      {'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});
+  }
   // Preserve an undated baseline for profiles already complete before this edit.
   if (path==='/profile' && post) await recordProfileCompletion(db,me,pilot,0);
   if (path==='/tag-search' && !post) {
