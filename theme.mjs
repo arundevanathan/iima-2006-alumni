@@ -25,6 +25,19 @@ export const tokens = `:root{color-scheme:light;
 --ink:#f3ece2;--muted:#b4aa9e;--night:#141110;--ochre:#c9993f}`;
 
 export const theme = `
+/* Shared album previews for Home, Memories and profile memory cards. */
+.collage-card .album-collage{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:3px;aspect-ratio:4/3;overflow:hidden;background:var(--paper)}
+.collage-card .album-collage-2{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
+.album-preview-tile{position:relative;display:block;min-width:0;min-height:0;overflow:hidden}
+.album-collage-3 .album-preview-tile:first-child{grid-row:1 / 3}
+.collage-card .album-collage .album-preview-tile img{display:block;width:100%;height:100%;aspect-ratio:auto;object-fit:cover;border-radius:0}
+.album-more{position:absolute;inset:0;background:#17110e88;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.2;padding:.3rem}
+.album-more strong{font:650 clamp(1.35rem,5vw,2.2rem)/1.1 var(--sans)}
+.album-more span{font-size:.72rem;margin-top:.2rem}
+.album-open-link{display:inline-flex;align-items:center;gap:.4rem;min-height:44px;margin:.15rem 0 .35rem;font-weight:650;font-size:.9rem;text-decoration:none}
+.album-open-link:hover{text-decoration:underline}
+.album-cover:focus-visible{outline:3px solid var(--brick-fired);outline-offset:-3px}
+
 body{background:var(--lime)}a{color:inherit;text-decoration:none}a:hover{color:var(--brick)}a,button{transition:background-color .16s,color .16s,box-shadow .16s}
 .bar{background:var(--paper);border-bottom:1px solid var(--line)}.bar .mast,main,footer{max-width:1280px;padding-inline:clamp(16px,4vw,52px)}.mast{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}.wordmark{display:flex;align-items:center;gap:10px;font:750 1rem var(--sans)}.wordmark img{width:39px;height:39px;aspect-ratio:1;object-fit:contain;background:white;padding:3px;border-radius:50%}
 nav{margin:0;gap:3px;align-items:center}nav a{font-size:.86rem;padding:.48rem .68rem;border-radius:8px}nav a:hover{background:var(--tint)}h1,h2,h3{letter-spacing:-.035em}article,fieldset,.panel{box-shadow:0 6px 24px #26201608;border-radius:16px}article a{font-weight:650}.plain li a:hover,figcaption a:hover{text-decoration:underline}
