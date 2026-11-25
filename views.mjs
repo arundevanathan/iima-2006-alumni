@@ -257,13 +257,12 @@ export const page={
         <div class="reunion-progress"><progress max="${critical}" value="${done}" aria-label="Reunion details complete">${done} of ${critical}</progress><span class="registry">${done} of ${critical} key details complete</span></div>
         ${missingDetails?'<p class="reunion-missing">Your attendance details are missing some important information. Please help us complete this.</p>':''}<a href="#reunion-details" data-reunion-details-open>Review your reunion details</a>
       </section>`:''}
-      <section class="reunion-section" id="reunion-agenda"><details class="reunion-agenda-panel"><summary><h2>Reunion agenda</h2><span>26–28 December · view programme</span></summary>
+      <section class="reunion-section" id="reunion-agenda"><h2>Reunion agenda</h2>
         <div class="reunion-days">${agenda.map(([date,theme,iso,rows,parallel])=>`<details>
           <summary><time datetime="${iso}">${e(date)}</time><span>${e(theme)}</span></summary>
           <ol class="reunion-timeline">${entries(rows)}</ol>
           ${parallel.length?`<h3>Activities for families and alumni</h3><ol class="reunion-timeline">${entries(parallel)}</ol>`:''}
         </details>`).join('')}</div>
-        </details>
       </section>
       ${tracker?`<section class="reunion-section" id="reunion-details">
         <details class="reunion-details-panel"${missingDetails||showSaved?' open':''}><summary><h2>Your reunion details</h2><span>${missingDetails?missing.length+' details to complete':'Complete · review or edit'}</span></summary>
