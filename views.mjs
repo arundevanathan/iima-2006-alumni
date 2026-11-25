@@ -257,6 +257,14 @@ export const page={
         <div class="reunion-progress"><progress max="${critical}" value="${done}" aria-label="Reunion details complete">${done} of ${critical}</progress><span class="registry">${done} of ${critical} key details complete</span></div>
         ${missingDetails?'<p class="reunion-missing">Your attendance details are missing some important information. Please help us complete this.</p>':''}<a href="#reunion-details" data-reunion-details-open>Review your reunion details</a>
       </section>`:''}
+      <section class="reunion-section" id="reunion-agenda"><details class="reunion-agenda-panel"><summary><h2>Reunion agenda</h2><span>26–28 December · view programme</span></summary>
+        <div class="reunion-days">${agenda.map(([date,theme,iso,rows,parallel])=>`<details>
+          <summary><time datetime="${iso}">${e(date)}</time><span>${e(theme)}</span></summary>
+          <ol class="reunion-timeline">${entries(rows)}</ol>
+          ${parallel.length?`<h3>Activities for families and alumni</h3><ol class="reunion-timeline">${entries(parallel)}</ol>`:''}
+        </details>`).join('')}</div>
+        </details>
+      </section>
       ${tracker?`<section class="reunion-section" id="reunion-details">
         <details class="reunion-details-panel"${missingDetails||showSaved?' open':''}><summary><h2>Your reunion details</h2><span>${missingDetails?missing.length+' details to complete':'Complete · review or edit'}</span></summary>
         ${missingDetails?'<p class="reunion-priority"><strong>Please complete the highlighted fields.</strong> The reunion team needs this information to plan for you and your guests.</p>':''}
@@ -281,13 +289,7 @@ export const page={
         </details>
       </section>`:''}
       <section class="reunion-section" id="reunion-attendees"><h2>Classmates attending</h2>${directory}</section>
-      <section class="reunion-section" id="reunion-agenda"><h2>Reunion agenda</h2>
-        <div class="reunion-days">${agenda.map(([date,theme,iso,rows,parallel])=>`<details>
-          <summary><time datetime="${iso}">${e(date)}</time><span>${e(theme)}</span></summary>
-          <ol class="reunion-timeline">${entries(rows)}</ol>
-          ${parallel.length?`<h3>Activities for families and alumni</h3><ol class="reunion-timeline">${entries(parallel)}</ol>`:''}
-        </details>`).join('')}</div>
-      </section>
+
     </div>`;
   },
   directory(rows,statuses,q,status,dorms,dorm,reunion=false,sections=[],section=''){return `<div class="classmates-directory"><form class="directory-controls" data-directory-filters method="get" action="${reunion?'/reunion#reunion-attendees':'/people'}">${input('q','Name, nickname or dorm',q)}${reunion?'':select('status','Attendance',[['','All classmates'],...Object.entries(statuses).filter(([,label])=>label)],status)}${dorms.length?select('dorm','Dorm',[['','All dorms'],...dorms.map(({dorm})=>[dorm,/^\d+$/.test(dorm)?'Dorm '+dorm:dorm])],dorm):''}${reunion?'':select('section','Section',[['','All sections'],...sections.map(({section})=>[section,section])],section)}<button>Search</button></form>
