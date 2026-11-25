@@ -27,11 +27,3 @@ export const completedProfilesCTE = `WITH ranked_profile AS (
     AND EXISTS(SELECT 1 FROM profile_photos ph WHERE ph.member=r.id AND ph.slot='then')
     AND EXISTS(SELECT 1 FROM profile_photos ph WHERE ph.member=r.id AND ph.slot='now')
 )`;
-
-export async function recordProfileCompletion(db, member, pilot, timestamp=Date.now()) {
-  // A repeat edit or an incomplete/recomplete cycle must not bump a profile to the top.
-  await db.prepare(`${completedProfilesCTE}
-    INSERT OR IGNORE INTO settings(key,value)
-    SELECT 'profile_completed:'||id,? FROM completed_profiles WHERE id=?`)
-    .bind(+pilot,String(timestamp),member).run();
-}

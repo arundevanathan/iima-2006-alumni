@@ -1,7 +1,7 @@
 import { render, signIn, page, form, field, escape, whatsappRequirements, whatsappUnlock } from './views.mjs';
 import { fonts } from './fonts.mjs';
 import { whatsappRoute } from './whatsapp.mjs';
-import { completedProfilesCTE, recordProfileCompletion } from './completion.mjs';
+import { completedProfilesCTE } from './completion.mjs';
 
 import { editReunionDetail, missingReunionDetails, reunionDetails, reunionValues } from './reunion.mjs';
 
@@ -46,8 +46,6 @@ export default {
         return write;
       };
       let response = await route(request, env, record, member=>{viewer=member;});
-      if (viewer && path==='/profile' && request.method==='POST' && (response.ok || response.status===303))
-        await recordProfileCompletion(env.DB,viewer,env.ACCESS_MODE!=='batch');
       if (env.PREVIEW_LABEL && response.headers.get('Content-Type')?.includes('text/html')) {
         const html=(await response.text()).replace(/<body\b[^>]*>/,tag=>tag+'<div role="note" style="padding:6px 12px;text-align:center;background:#e4c58b;color:#251b14;font:600 12px/1.4 sans-serif">Preview · live data</div>');
         response=new Response(html,{status:response.status,headers:response.headers});
@@ -233,8 +231,6 @@ async function route(req, env, record, setViewer) {
     return redirect('https://staging-iima-2006-alumni.arun-devanathan.workers.dev/verify#token='+raw,
       {'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});
   }
-  // Preserve an undated baseline for profiles already complete before this edit.
-  if (path==='/profile' && post) await recordProfileCompletion(db,me,pilot,0);
   if (path==='/tag-search' && !post) {
     const q = (u.searchParams.get('q')||'').trim().slice(0,80);
     if (q.length<2) return json([]);
@@ -453,11 +449,11 @@ async function route(req, env, record, setViewer) {
       ORDER BY random() LIMIT 12`,+pilot),meetSummary(),whatsappCompletion(),
       all(`${completedProfilesCTE}
         SELECT r.id,r.name,r.dorm,r.nickname,c.city,c.life,${portrait} AS portrait,
-          CAST(st.value AS INTEGER) AS completed_at
+          pc.completed_at,pc.basis AS completion_basis
         FROM completed_profiles c JOIN roster r ON r.id=c.id ${seedJoin}
-        LEFT JOIN settings st ON st.key='profile_completed:'||r.id
+        LEFT JOIN profile_completion pc ON pc.member=r.id
         WHERE NOT EXISTS(SELECT 1 FROM members m WHERE m.id=r.id AND m.suspended=1)
-        ORDER BY coalesce(completed_at,0) DESC,r.name LIMIT 6`,+pilot,+pilot)]);
+        ORDER BY coalesce(pc.completed_at,pc.observed_at,0) DESC,pc.observed_order DESC,r.name LIMIT 6`,+pilot,+pilot)]);
     return render('Kal • Aaj • Aur Kal',page.home(rows,people,next,id(),me,meet,unlock,fresh),member,{home:true,active:'/'});
   }
   if (path==='/people' || path==='/reunion') {

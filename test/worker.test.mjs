@@ -95,31 +95,61 @@ test('fresh profiles require all seven items, record first completion and preser
    INSERT INTO yearbook_public VALUES(1,'{"city":"Mumbai","life":"Admin life","family":"Family"}','[]');
    INSERT INTO profile_fields VALUES(1,'thenPhotoObject','admin-then.jpg'),(1,'nowPhotoObject','admin-now.jpg');
    INSERT INTO profile_fields VALUES(2,'city','Bangalore'),(2,'life','A new chapter'),(2,'thenPhotoObject','then.jpg');
+   UPDATE profile_completion SET completed_at=NULL,basis='baseline' WHERE member=1;
  `);
  let html=await body(await call('/',ck));
  let section=html.match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
  assert.match(section,/Test Admin/);assert.doesNotMatch(section,/Test Classmate|Completed today/);
  assert.ok(html.indexOf('id="fresh-profiles-title"')<html.indexOf('class="meet-banner"'));
  assert.equal((await call('/profile',ck,{field:'city',value:'Pune'})).status,303);
- assert.equal(sqlite.prepare("SELECT count(*) n FROM settings WHERE key='profile_completed:2'").get().n,0);
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM profile_completion WHERE member=2").get().n,0);
  sqlite.exec("INSERT INTO profile_fields VALUES(2,'nowPhotoObject','now.jpg')");
  assert.equal((await call('/profile',ck,{field:'family',value:'Family'})).status,303);
- const first=sqlite.prepare("SELECT value FROM settings WHERE key='profile_completed:2'").get().value;
+ const first=sqlite.prepare("SELECT completed_at FROM profile_completion WHERE member=2").get().completed_at;
  html=await body(await call('/',ck));
  section=html.match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
  assert.ok(section.indexOf('Test Classmate')<section.indexOf('Test Admin'));
  assert.match(section,/Pune/);assert.match(section,/Completed today/);
  const adminCookie=await session(1,'aaaa');
  await call('/profile',adminCookie,{field:'city',value:'Mumbai'});
- assert.equal(sqlite.prepare("SELECT value FROM settings WHERE key='profile_completed:1'").get().value,'0');
+ assert.equal(sqlite.prepare("SELECT completed_at FROM profile_completion WHERE member=1").get().completed_at,null);
  await call('/profile',ck,{field:'family',value:''});
  section=(await body(await call('/',ck))).match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
  assert.doesNotMatch(section,/Test Classmate/);
  await call('/profile',ck,{field:'family',value:'Family again'});
- assert.equal(sqlite.prepare("SELECT value FROM settings WHERE key='profile_completed:2'").get().value,first);
+ assert.equal(sqlite.prepare("SELECT completed_at FROM profile_completion WHERE member=2").get().completed_at,first);
  sqlite.exec('UPDATE members SET suspended=1 WHERE id=1');
  section=(await body(await call('/',ck))).match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
  assert.doesNotMatch(section,/Test Admin/);
+});
+
+test('database tracking captures live writes before preview visits and preserves imported dates',async()=>{
+ const {call,session,sqlite}=fixture();
+ sqlite.exec(`
+  INSERT INTO yearbook_public VALUES(1,'{"city":"Mumbai","life":"An older entry","family":"Family"}','[]');
+  INSERT INTO profile_fields VALUES(1,'thenPhotoObject','old-then.jpg'),(1,'nowPhotoObject','old-now.jpg');
+  DELETE FROM profile_completion WHERE member=1;
+ `);
+ // Applying the migration to an existing completed entry must not invent its date.
+ sqlite.exec(readFileSync(new URL('../migrations/0017_profile_completion.sql',import.meta.url),'utf8'));
+ assert.equal(sqlite.prepare('SELECT completed_at FROM profile_completion WHERE member=1').get().completed_at,null);
+ sqlite.exec(`INSERT INTO profile_fields VALUES
+  (2,'city','Pune'),(2,'life','A new chapter'),(2,'thenPhotoObject','then.jpg'),(2,'nowPhotoObject','now.jpg');`);
+ assert.equal(sqlite.prepare('SELECT count(*) n FROM profile_completion WHERE member=2').get().n,0);
+ // Simulate the existing production Worker, which knows nothing about preview tracking.
+ sqlite.exec("INSERT OR REPLACE INTO profile_fields VALUES(2,'family','Family')");
+ const first=sqlite.prepare('SELECT completed_at FROM profile_completion WHERE member=2').get().completed_at;
+ assert.ok(first>0);
+ sqlite.exec("INSERT OR REPLACE INTO profile_fields VALUES(2,'city','Bangalore')");
+ assert.equal(sqlite.prepare('SELECT completed_at FROM profile_completion WHERE member=2').get().completed_at,first);
+ const ck=await session(1,'aaaa');
+ const html=await body(await call('/',ck));
+ const section=html.match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
+ assert.ok(section.indexOf('Test Classmate')<section.indexOf('Test Admin'));
+ assert.match(section,/Completed today/);
+ sqlite.exec("UPDATE profile_completion SET completed_at=NULL,observed_at=1,observed_order=1,basis='observed' WHERE member=2");
+ const observed=(await body(await call('/',ck))).match(/<section class="home-classmates home-fresh"[\s\S]*?<\/section>/)[0];
+ assert.match(observed,/Recently completed/);assert.doesNotMatch(observed,/Completed today/);
 });
 
 test('current interactions and feed',async()=>{
