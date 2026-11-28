@@ -1,3 +1,4 @@
+import {dryRun as memoryWallDryRun} from './memory-wall-selection.mjs';
 import {isMemorial, loadTribute, memorialPhotos} from './memorial.mjs';
 import { render, signIn, page, form, field, escape, whatsappRequirements, whatsappUnlock, reunionCatchups, siteCSS, siteCSSVersion } from './views.mjs';
 import { fonts } from './fonts.mjs';
@@ -1145,6 +1146,39 @@ async function route(req, env, record, setViewer, ctx) {
       WHERE n.recipient=? AND ${notificationVisible}
       ORDER BY n.created DESC,n.id DESC LIMIT 100`,+pilot,me);
     return show('Notifications',page.notifications(rows,me,(await whatsappCompletion()).every(check=>check.complete)));
+  }
+  if (path==='/admin/memory-walls') {
+    if (!admin || req.method!=='GET') return missing();
+    const result=await memoryWallDryRun(db);
+    const roster=await all('SELECT id,name FROM roster ORDER BY name');
+    const names=new Map(roster.map(r=>[r.id,r.name]));
+    const labels={activities:'Campus activities',campus:'Campus life',reunion:'2016 reunion',people:'People wall'};
+    const key=Object.hasOwn(labels,u.searchParams.get('wall'))?u.searchParams.get('wall'):'activities';
+    const tabs=Object.entries(labels).map(([k,label])=>'<a href="/admin/memory-walls?wall='+k+'" '+(k===key?'aria-current="page"':'')+'>'+label+'</a>').join(' · ');
+    let tiles='',summary='';
+    if(key==='people'){
+      const portraits=await all("SELECT r.id,r.name,(SELECT value FROM profile_fields WHERE member=r.id AND field='thenPhotoObject' AND trim(value) NOT IN ('','null')) AS then_key,(SELECT object_key FROM face_refs WHERE member=r.id AND source IN ('archive','yearbook','then') ORDER BY CASE source WHEN 'archive' THEN 0 WHEN 'yearbook' THEN 1 ELSE 2 END LIMIT 1) AS fallback FROM roster r ORDER BY r.name");
+      tiles=portraits.map(r=>'<figure style="margin:0;min-width:0">'+(r.then_key||r.fallback?'<img loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover" src="/admin/memory-wall-portrait?id='+r.id+'" alt="'+escape(r.name)+'">':'<div style="aspect-ratio:1;background:#ddd">Missing</div>')+'<figcaption style="font-size:10px;overflow-wrap:anywhere">'+escape(r.name)+'</figcaption></figure>').join('');
+      summary=portraits.filter(r=>r.then_key||r.fallback).length+' / '+portraits.length+' potential portraits';
+    }else{
+      const rows=result.walls[key];
+      summary=rows.length+' / 84 photos · '+new Set(rows.flatMap(r=>r.people)).size+' classmates on this wall';
+      tiles=rows.map(r=>'<a href="/media/post/'+encodeURIComponent(r.id)+'" target="_blank" rel="noopener" title="'+escape(r.album+' — '+r.people.map(id=>names.get(id)||id).join(', '))+'"><img loading="lazy" style="display:block;width:100%;aspect-ratio:1;object-fit:cover" src="/media/post/'+encodeURIComponent(r.id)+'?w=256" alt="'+escape(r.album)+'"></a>').join('');
+    }
+    const missingNames=result.report.missing.map(id=>escape(names.get(id)||String(id))).join(', ');
+    const body='<h1>Memory walls — read-only preview</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>'+summary+'</p><p>Overall thematic coverage: '+result.report.covered+' / '+result.report.roster+' · Twice: '+result.report.atLeastTwo+' · Three times: '+result.report.atLeastThree+'</p><div style="overflow:auto"><div style="min-width:720px;background:#eee6d7;padding:16px;color:#803f2e"><h2 style="text-align:center">'+labels[key]+'</h2><div style="display:grid;grid-template-columns:repeat('+(key==='people'?17:12)+',minmax(0,1fr));gap:4px">'+tiles+'</div><h3 style="text-align:center">IIMA · Class of 06</h3></div></div><details><summary>Unrepresented classmates ('+result.report.missing.length+')</summary><p>'+missingNames+'</p></details><details><summary>Album distribution</summary><ul>'+Object.entries(result.report.albums).filter(([,n])=>n>0).map(([a,n])=>'<li>'+escape(a)+': '+n+'</li>').join('')+'</ul></details>';
+    const response=await show('Memory walls',body);
+    response.headers.set('Cache-Control','private, no-store');
+    return response;
+  }
+  if(path==='/admin/memory-wall-portrait'){
+    if(!admin || req.method!=='GET')return missing();
+    const memberId=Number(u.searchParams.get('id'));
+    if(!Number.isSafeInteger(memberId))return missing();
+    const row=await one("SELECT COALESCE((SELECT value FROM profile_fields WHERE member=r.id AND field='thenPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT object_key FROM face_refs WHERE member=r.id AND source IN ('archive','yearbook','then') ORDER BY CASE source WHEN 'archive' THEN 0 WHEN 'yearbook' THEN 1 ELSE 2 END LIMIT 1)) AS object_key FROM roster r WHERE r.id=?",memberId);
+    const response=await servePhoto(env,row,req,false,ctx);
+    const headers=new Headers(response.headers);headers.set('Cache-Control','private, no-store');
+    return new Response(response.body,{status:response.status,headers});
   }
   if (path==='/admin/analytics' && admin && !post) {
     const days=u.searchParams.get('days')==='90'?90:30;
