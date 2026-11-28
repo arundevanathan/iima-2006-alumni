@@ -10,6 +10,14 @@ import { iimagesSchema, setYearbookHidden, yearbookEntry, yearbookPhotoKey } fro
 
 import { editReunionDetail, missingReunionDetails, reunionDetails, reunionValues } from './reunion.mjs';
 
+// Short-lived per-isolate cache, only reached after admin authorization.
+let memoryWallCache;
+async function cachedMemoryWalls(db) {
+  if(memoryWallCache?.db===db && memoryWallCache.until>Date.now())return memoryWallCache.promise;
+  const entry={db,until:Date.now()+120000,promise:memoryWallDryRun(db)};
+  memoryWallCache=entry;
+  try{return await entry.promise;}catch(error){if(memoryWallCache===entry)memoryWallCache=undefined;throw error;}
+}
 const photoWidths = new Set(['96','256','480','768','1200']);
 // Sizes generated right after upload: memory cards and viewers, and profile portraits / Then-Now photos.
 const memoryWidths = ['480','1200'];
@@ -1149,7 +1157,7 @@ async function route(req, env, record, setViewer, ctx) {
   }
   if (path==='/admin/memory-walls') {
     if (!admin || req.method!=='GET') return missing();
-    const result=await memoryWallDryRun(db);
+    const result=await cachedMemoryWalls(db);
     const roster=await all('SELECT id,name FROM roster ORDER BY name');
     const names=new Map(roster.map(r=>[r.id,r.name]));
     const labels={activities:'Campus activities',campus:'Campus life',reunion:'2016 reunion',people:'People wall'};
@@ -1158,12 +1166,12 @@ async function route(req, env, record, setViewer, ctx) {
     let tiles='',summary='';
     if(key==='people'){
       const portraits=await all("SELECT r.id,r.name,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='dorm' AND trim(value) NOT IN ('','null')),r.dorm) AS dorm,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='section' AND trim(value) NOT IN ('','null')),(SELECT section FROM roster_sections WHERE member=r.id)) AS section,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='nowPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='portraitObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(portrait_key),'') FROM profile_seeds WHERE roster_id=r.id AND review_status='approved')) AS then_key,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='thenPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT object_key FROM face_refs WHERE member=r.id AND source IN ('archive','yearbook','then') ORDER BY CASE source WHEN 'archive' THEN 0 WHEN 'yearbook' THEN 1 ELSE 2 END LIMIT 1)) AS fallback FROM roster r ORDER BY r.name");
-      tiles=portraits.map(r=>'<figure style="margin:0;min-width:0">'+(r.then_key||r.fallback?'<img loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover" src="/admin/memory-wall-portrait?id='+r.id+'&w=256" alt="'+escape(r.name)+'">':'<div style="aspect-ratio:1;background:#ddd">Missing</div>')+'<figcaption style="font-size:10px;overflow-wrap:anywhere">'+escape(r.name)+'<br>'+escape([r.dorm,r.section?(String(r.section).toLowerCase().startsWith('section')?r.section:'Section '+r.section):''].filter(Boolean).join(' · '))+'</figcaption></figure>').join('');
+      tiles=portraits.map(r=>'<figure style="margin:0;min-width:0">'+(r.then_key||r.fallback?'<img loading="lazy" decoding="async" style="width:100%;aspect-ratio:1;object-fit:cover" src="/admin/memory-wall-portrait?id='+r.id+'&w=96" alt="'+escape(r.name)+'">':'<div style="aspect-ratio:1;background:#ddd">Missing</div>')+'<figcaption style="font-size:10px;overflow-wrap:anywhere">'+escape(r.name)+'<br>'+escape([r.dorm,r.section?(String(r.section).toLowerCase().startsWith('section')?r.section:'Section '+r.section):''].filter(Boolean).join(' · '))+'</figcaption></figure>').join('');
       summary=portraits.filter(r=>r.then_key||r.fallback).length+' / '+portraits.length+' potential portraits · '+portraits.filter(r=>r.then_key).length+' contemporary sources';
     }else{
       const rows=result.walls[key];
       summary=rows.length+' / 84 photos · '+new Set(rows.flatMap(r=>r.people)).size+' classmates on this wall';
-      tiles=rows.map(r=>'<a href="/media/post/'+encodeURIComponent(r.id)+'" target="_blank" rel="noopener" title="'+escape(r.album+' — '+r.people.map(id=>names.get(id)||id).join(', '))+'"><img loading="lazy" style="display:block;width:100%;aspect-ratio:1;object-fit:cover" src="/media/post/'+encodeURIComponent(r.id)+'?w=256" alt="'+escape(r.album)+'"></a>').join('');
+      tiles=rows.map(r=>'<a href="/media/post/'+encodeURIComponent(r.id)+'" target="_blank" rel="noopener" title="'+escape(r.album+' — '+r.people.map(id=>names.get(id)||id).join(', '))+'"><img loading="lazy" decoding="async" style="display:block;width:100%;aspect-ratio:1;object-fit:cover" src="/media/post/'+encodeURIComponent(r.id)+'?w=96" alt="'+escape(r.album)+'"></a>').join('');
     }
     const missingNames=result.report.missing.map(id=>escape(names.get(id)||String(id))).join(', ');
     const body='<h1>Memory walls — read-only preview</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>'+summary+'</p><p>Overall thematic coverage: '+result.report.covered+' / '+result.report.roster+' · Twice: '+result.report.atLeastTwo+' · Three times: '+result.report.atLeastThree+'</p><div style="overflow:auto"><div style="min-width:720px;background:#eee6d7;padding:16px;color:#803f2e"><h2 style="text-align:center">'+labels[key]+'</h2><div style="display:grid;grid-template-columns:repeat('+(key==='people'?17:12)+',minmax(0,1fr));gap:4px">'+tiles+'</div><h3 style="text-align:center">IIMA · Class of 06</h3></div></div><details><summary>Unrepresented classmates ('+result.report.missing.length+')</summary><p>'+missingNames+'</p></details><details><summary>Album distribution</summary><ul>'+Object.entries(result.report.albums).filter(([,n])=>n>0).map(([a,n])=>'<li>'+escape(a)+': '+n+'</li>').join('')+'</ul></details>';
@@ -1177,7 +1185,7 @@ async function route(req, env, record, setViewer, ctx) {
     if(!Number.isSafeInteger(memberId))return missing();
     const row=await one("SELECT COALESCE(COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='nowPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='portraitObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(portrait_key),'') FROM profile_seeds WHERE roster_id=r.id AND review_status='approved')),COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='thenPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT object_key FROM face_refs WHERE member=r.id AND source IN ('archive','yearbook','then') ORDER BY CASE source WHEN 'archive' THEN 0 WHEN 'yearbook' THEN 1 ELSE 2 END LIMIT 1))) AS object_key FROM roster r WHERE r.id=?",memberId);
     const response=await servePhoto(env,row,req,false,ctx);
-    const headers=new Headers(response.headers);headers.set('Cache-Control','private, no-store');
+    const headers=new Headers(response.headers);if(response.ok||response.status===304)headers.set('Cache-Control','private, max-age=300, must-revalidate');
     return new Response(response.body,{status:response.status,headers});
   }
   if (path==='/admin/analytics' && admin && !post) {
