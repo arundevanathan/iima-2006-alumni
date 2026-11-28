@@ -1,3 +1,7 @@
+function memoryWallTabs(key){const keys=['activities','campus','reunion'];
+    const descriptions={activities:['Campus activities','T-Nite, Chaos, Confluence and other campus events'],campus:['Campus life','Dorms, parties, ramps and everyday memories'],reunion:['2016 reunion','Ten-year reunion moments and old friends'],people:['People wall','Classmates today, with dorm and section']};
+    return '<nav style="display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:8px;margin:16px 0;overflow-x:auto">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;min-width:0;overflow-wrap:anywhere;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
+}
 import {studioHTML,studioJS} from './memory-wall-studio.mjs';
 import {candidateSQL,classify,selectWalls,dryRun as memoryWallDryRun} from './memory-wall-selection.mjs';
 import {isMemorial, loadTribute, memorialPhotos} from './memorial.mjs';
@@ -1171,36 +1175,44 @@ async function route(req, env, record, setViewer, ctx) {
     if(path==='/admin/memory-wall-layout'){
       if(!post)return missing();
       let input;try{input=await req.json();}catch{return new Response('Invalid JSON',{status:400});}
-      if(!input||input.revision!==(saved?.revision||0))return new Response('Another admin changed the layout. Reload before saving.',{status:409});
-      const seen=new Set();
-      for(const k of keys){
-        const slots=input.walls?.[k];
-        if(!Array.isArray(slots)||slots.length!==84)return new Response('Invalid slots',{status:400});
-        for(const id of slots){if(id===null)continue;const p=map.get(id);if(!p||p.theme!==k||seen.has(p.digest))return new Response('Invalid or duplicate photo',{status:400});seen.add(p.digest);}
-      }
-      const payload=JSON.stringify(Object.fromEntries(keys.map(k=>[k,input.walls[k]])));
-      const result=await run('INSERT INTO memory_wall_layout(id,revision,payload) VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,payload=excluded.payload WHERE revision=?',payload,input.revision);
-      if(!result.meta.changes)return new Response('Another admin changed the layout. Reload before saving.',{status:409});
+      const k=input?.key;
+      if(!keys.includes(k)||!Array.isArray(input.slots)||input.slots.length!==84||!Number.isInteger(input.revision))return new Response('Invalid slots',{status:400});
+      const old=saved?JSON.parse(saved.payload):null;
+      const revisions=old?._revisions||Object.fromEntries(keys.map(k=>[k,saved?.revision||0]));
+      if(input.revision!==revisions[k])return new Response('Another admin changed this wall. Reload before saving.',{status:409});
+      for(const id of input.slots)if(id!==null&&!map.has(id)&&!old?.[k]?.includes(id))return new Response('Invalid photo',{status:400});
+      const auto=old||Object.fromEntries(keys.map(k=>[k,selectWalls(rows,roster.map(r=>r.id)).walls[k].map(p=>p.id)]));
+      const payload=JSON.stringify({...auto,[k]:input.slots,_revisions:{...revisions,[k]:input.revision+1}});
+      const result=await run('INSERT INTO memory_wall_layout(id,revision,payload) VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,payload=excluded.payload WHERE revision=?',payload,saved?.revision||0);
+      if(!result.meta.changes)return new Response('Another save occurred simultaneously. Retry saving.',{status:409});
       return json({revision:input.revision+1});
     }
     if(post)return missing();
     const key=keys.includes(u.searchParams.get('wall'))?u.searchParams.get('wall'):'activities';
     const auto=saved?null:selectWalls(rows,roster.map(r=>r.id));
     const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
-    const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>map.has(selected[k]?.[i])?selected[k][i]:null)]));
-    const descriptions={activities:['Campus activities','T-Nite, Chaos, Confluence and other campus events'],campus:['Campus life','Dorms, parties, ramps and everyday memories'],reunion:['2016 reunion','Ten-year reunion moments and old friends'],people:['People wall','Classmates today, with dorm and section']};
-    const tabs='<nav style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:16px 0">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
-    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>Select a photo then another slot to move or swap. Drag and drop also works on desktop.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
+    const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>selected[k]?.[i]??null)]));
+    const tabs=memoryWallTabs(key);
+    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p>Open Edit Wall to select slots, then choose an action.</p>'+studioHTML({key,roster,photos,initial,revision:selected._revisions?.[key]??saved?.revision??0}));
     response.headers.set('Cache-Control','private, no-store');return response;
   }
   if (path==='/admin/memory-walls') {
     if (!admin || req.method!=='GET') return missing();
-    const result=await cachedMemoryWalls(db);
+    await run('CREATE TABLE IF NOT EXISTS memory_wall_layout (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL)');
+    const saved=await one('SELECT payload FROM memory_wall_layout WHERE id=1');
+    let result;
+    if(saved){
+      const rows=await all(candidateSQL), layout=JSON.parse(saved.payload), byId=new Map(rows.map(r=>[r.id,r]));
+      const counts=new Map((await all('SELECT id FROM roster')).map(r=>[r.id,0])), albums={};
+      const walls=Object.fromEntries(['activities','campus','reunion'].map(k=>[k,(layout[k]||[]).map(id=>byId.get(id)).filter(Boolean).map(r=>({...r,people:JSON.parse(r.people)}))]));
+      for(const p of Object.values(walls).flat()){albums[p.album]=(albums[p.album]||0)+1;for(const id of p.people)if(counts.has(id))counts.set(id,counts.get(id)+1);}
+      result={walls,report:{roster:counts.size,covered:[...counts.values()].filter(n=>n>0).length,atLeastTwo:[...counts.values()].filter(n=>n>=2).length,atLeastThree:[...counts.values()].filter(n=>n>=3).length,missing:[...counts].filter(([,n])=>!n).map(([id])=>id),albums}};
+    }else result=await cachedMemoryWalls(db);
     const roster=await all('SELECT id,name FROM roster ORDER BY name');
     const names=new Map(roster.map(r=>[r.id,r.name]));
     const labels={activities:'Campus activities',campus:'Campus life',reunion:'2016 reunion',people:'People wall'};
     const key=Object.hasOwn(labels,u.searchParams.get('wall'))?u.searchParams.get('wall'):'activities';
-    const tabs=Object.entries(labels).map(([k,label])=>'<a href="/admin/memory-walls?wall='+k+'" '+(k===key?'aria-current="page"':'')+'>'+label+'</a>').join(' · ');
+    const tabs=memoryWallTabs(key);
     let tiles='',summary='';
     if(key==='people'){
       const portraits=await all("SELECT r.id,r.name,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='dorm' AND trim(value) NOT IN ('','null')),r.dorm) AS dorm,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='section' AND trim(value) NOT IN ('','null')),(SELECT section FROM roster_sections WHERE member=r.id)) AS section,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='nowPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='portraitObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(portrait_key),'') FROM profile_seeds WHERE roster_id=r.id AND review_status='approved')) AS then_key,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='thenPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT object_key FROM face_refs WHERE member=r.id AND source IN ('archive','yearbook','then') ORDER BY CASE source WHEN 'archive' THEN 0 WHEN 'yearbook' THEN 1 ELSE 2 END LIMIT 1)) AS fallback FROM roster r ORDER BY r.name");
@@ -1212,7 +1224,7 @@ async function route(req, env, record, setViewer, ctx) {
       tiles=rows.map(r=>'<a href="/media/post/'+encodeURIComponent(r.id)+'" target="_blank" rel="noopener" title="'+escape(r.album+' — '+r.people.map(id=>names.get(id)||id).join(', '))+'"><img loading="lazy" decoding="async" style="display:block;width:100%;aspect-ratio:1;object-fit:cover" src="/media/post/'+encodeURIComponent(r.id)+'?w=96" alt="'+escape(r.album)+'"></a>').join('');
     }
     const missingNames=result.report.missing.map(id=>escape(names.get(id)||String(id))).join(', ');
-    const body='<h1>Memory walls — read-only preview</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>'+summary+'</p><p>Overall thematic coverage: '+result.report.covered+' / '+result.report.roster+' · Twice: '+result.report.atLeastTwo+' · Three times: '+result.report.atLeastThree+'</p><div style="overflow:auto"><div style="min-width:720px;background:#eee6d7;padding:16px;color:#803f2e"><h2 style="text-align:center">'+labels[key]+'</h2><div style="display:grid;grid-template-columns:repeat('+(key==='people'?17:12)+',minmax(0,1fr));gap:4px">'+tiles+'</div><h3 style="text-align:center">IIMA · Class of 06</h3></div></div><details><summary>Unrepresented classmates ('+result.report.missing.length+')</summary><p>'+missingNames+'</p></details><details><summary>Album distribution</summary><ul>'+Object.entries(result.report.albums).filter(([,n])=>n>0).map(([a,n])=>'<li>'+escape(a)+': '+n+'</li>').join('')+'</ul></details>';
+    const body='<h1>Memory walls — read-only preview</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p>'+summary+'</p><p>Overall thematic coverage: '+result.report.covered+' / '+result.report.roster+' · Twice: '+result.report.atLeastTwo+' · Three times: '+result.report.atLeastThree+'</p><div style="overflow:auto"><div style="min-width:720px;background:#eee6d7;padding:16px;color:#803f2e"><h2 style="text-align:center">'+labels[key]+'</h2><div style="display:grid;grid-template-columns:repeat('+(key==='people'?17:12)+',minmax(0,1fr));gap:4px">'+tiles+'</div><h3 style="text-align:center">IIMA · Class of 06</h3></div></div><details><summary>Unrepresented classmates ('+result.report.missing.length+')</summary><p>'+missingNames+'</p></details><details><summary>Album distribution</summary><ul>'+Object.entries(result.report.albums).filter(([,n])=>n>0).map(([a,n])=>'<li>'+escape(a)+': '+n+'</li>').join('')+'</ul></details>';
     const response=await show('Memory walls',body);
     response.headers.set('Cache-Control','private, no-store');
     return response;
