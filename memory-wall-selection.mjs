@@ -7,14 +7,13 @@ export const themes = {
 export function classify(title) {
  return Object.keys(themes).find(k=>themes[k].test((title||'').trim())) || null;
 }
-export const candidateSQL = `SELECT u.id,u.digest,u.object_key,u.post,a.title AS album,
+export const candidateSQL = `SELECT u.id,u.digest,u.object_key,u.post,COALESCE(a.title, NULLIF(u.caption,''), p.body) AS album,
  s.width,s.height,
  (SELECT json_group_array(DISTINCT CAST(t.target AS INTEGER)) FROM active_photo_tags t JOIN roster r ON r.id=CAST(t.target AS INTEGER) WHERE t.post=u.post AND t.media='post/'||u.id AND t.kind='person') AS people
  FROM active_uploads u JOIN posts p ON p.id=u.post
- JOIN memory_albums a ON a.post=p.id
- JOIN json_each(a.photo_order) j ON j.value=u.id
+ LEFT JOIN memory_albums a ON a.post=p.id
  LEFT JOIN face_scans s ON s.media='post/'||u.id AND s.status='done'
- WHERE p.hidden=0 AND NOT EXISTS(SELECT 1 FROM roster r WHERE lower(trim(r.name))='sachin kumar suman' AND (p.subject=r.id OR EXISTS(SELECT 1 FROM memory_about m WHERE m.post=p.id AND m.kind='person' AND m.target=CAST(r.id AS TEXT))))`;
+ WHERE p.hidden=0 AND (a.post IS NULL OR EXISTS(SELECT 1 FROM json_each(a.photo_order) j WHERE j.value=u.id)) AND NOT EXISTS(SELECT 1 FROM roster r WHERE lower(trim(r.name))='sachin kumar suman' AND (p.subject=r.id OR EXISTS(SELECT 1 FROM memory_about m WHERE m.post=p.id AND m.kind='person' AND m.target=CAST(r.id AS TEXT))))`;
 export function selectWalls(rows, roster, limit=84) {
  const keys=Object.keys(themes), walls=Object.fromEntries(keys.map(k=>[k,[]]));
  const counts=new Map(roster.map(id=>[Number(id),0])), used=new Set(), albums=new Map();
@@ -32,6 +31,22 @@ export function selectWalls(rows, roster, limit=84) {
  if(!best)break;
  walls[best.theme].push(best);used.add(best.digest);albums.set(best.album,(albums.get(best.album)||0)+1);
  for(const id of best.people)counts.set(id,counts.get(id)+1);
+ }
+ // Improve breadth and depth with strictly improving single-slot swaps.
+ const utility=n=>n===0?0: n===1?10000:n===2?10100:n===3?10140:10140+Math.min(n-3,3)*5;
+ for(let pass=0;pass<3;pass++){
+ let changed=false;
+ for(const k of keys)for(let i=0;i<walls[k].length;i++){
+ const old=walls[k][i];used.delete(old.digest);
+ for(const id of old.people)counts.set(id,counts.get(id)-1);
+ const gain=r=>r.people.reduce((s,id)=>s+utility(counts.get(id)+1)-utility(counts.get(id)),0);
+ let best=old, value=gain(old);
+ for(const r of candidates)if(r.theme===k&&!used.has(r.digest)&&gain(r)>value){best=r;value=gain(r);}
+ walls[k][i]=best;used.add(best.digest);
+ for(const id of best.people)counts.set(id,counts.get(id)+1);
+ if(best!==old){changed=true;albums.set(old.album,albums.get(old.album)-1);albums.set(best.album,(albums.get(best.album)||0)+1);}
+ }
+ if(!changed)break;
  }
  return {walls,report:{selected:Object.fromEntries(keys.map(k=>[k,walls[k].length])),covered:[...counts.values()].filter(n=>n>0).length,atLeastTwo:[...counts.values()].filter(n=>n>=2).length,atLeastThree:[...counts.values()].filter(n=>n>=3).length,roster:counts.size,missing:[...counts].filter(([,n])=>!n).map(([id])=>id),albums:Object.fromEntries(albums)}};
 }
