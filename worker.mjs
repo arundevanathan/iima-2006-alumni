@@ -1,4 +1,5 @@
-import {dryRun as memoryWallDryRun} from './memory-wall-selection.mjs';
+import {studioHTML,studioJS} from './memory-wall-studio.mjs';
+import {candidateSQL,classify,selectWalls,dryRun as memoryWallDryRun} from './memory-wall-selection.mjs';
 import {isMemorial, loadTribute, memorialPhotos} from './memorial.mjs';
 import { render, signIn, page, form, field, escape, whatsappRequirements, whatsappUnlock, reunionCatchups, siteCSS, siteCSSVersion } from './views.mjs';
 import { fonts } from './fonts.mjs';
@@ -1154,6 +1155,43 @@ async function route(req, env, record, setViewer, ctx) {
       WHERE n.recipient=? AND ${notificationVisible}
       ORDER BY n.created DESC,n.id DESC LIMIT 100`,+pilot,me);
     return show('Notifications',page.notifications(rows,me,(await whatsappCompletion()).every(check=>check.complete)));
+  }
+  if(path==='/admin/memory-wall-studio.js'){
+    if(!admin||post)return missing();
+    return new Response(studioJS,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'private, no-store'}});
+  }
+  if(path==='/admin/memory-wall-layout' || (path==='/admin/memory-walls' && u.searchParams.get('wall')!=='people')){
+    if(!admin)return missing();
+    await run('CREATE TABLE IF NOT EXISTS memory_wall_layout (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL)');
+    const saved=await one('SELECT revision,payload FROM memory_wall_layout WHERE id=1');
+    const rows=await all(candidateSQL);
+    const roster=await all("SELECT r.id,r.name,r.dorm,rs.section FROM roster r LEFT JOIN roster_sections rs ON rs.member=r.id ORDER BY r.name");
+    const photos=rows.map(r=>({id:r.id,digest:r.digest,album:r.album,theme:classify(r.album),people:JSON.parse(r.people)})).filter(r=>r.theme&&r.digest&&r.people.length);
+    const keys=['activities','campus','reunion'], map=new Map(photos.map(p=>[p.id,p]));
+    if(path==='/admin/memory-wall-layout'){
+      if(!post)return missing();
+      let input;try{input=await req.json();}catch{return new Response('Invalid JSON',{status:400});}
+      if(!input||input.revision!==(saved?.revision||0))return new Response('Another admin changed the layout. Reload before saving.',{status:409});
+      const seen=new Set();
+      for(const k of keys){
+        const slots=input.walls?.[k];
+        if(!Array.isArray(slots)||slots.length!==84)return new Response('Invalid slots',{status:400});
+        for(const id of slots){if(id===null)continue;const p=map.get(id);if(!p||p.theme!==k||seen.has(p.digest))return new Response('Invalid or duplicate photo',{status:400});seen.add(p.digest);}
+      }
+      const payload=JSON.stringify(Object.fromEntries(keys.map(k=>[k,input.walls[k]])));
+      const result=await run('INSERT INTO memory_wall_layout(id,revision,payload) VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,payload=excluded.payload WHERE revision=?',payload,input.revision);
+      if(!result.meta.changes)return new Response('Another admin changed the layout. Reload before saving.',{status:409});
+      return json({revision:input.revision+1});
+    }
+    if(post)return missing();
+    const key=keys.includes(u.searchParams.get('wall'))?u.searchParams.get('wall'):'activities';
+    const auto=saved?null:selectWalls(rows,roster.map(r=>r.id));
+    const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
+    const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>map.has(selected[k]?.[i])?selected[k][i]:null)]));
+    const descriptions={activities:['Campus activities','T-Nite, Chaos, Confluence and other campus events'],campus:['Campus life','Dorms, parties, ramps and everyday memories'],reunion:['2016 reunion','Ten-year reunion moments and old friends'],people:['People wall','Classmates today, with dorm and section']};
+    const tabs='<nav style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:16px 0">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
+    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>Select a photo then another slot to move or swap. Drag and drop also works on desktop.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
+    response.headers.set('Cache-Control','private, no-store');return response;
   }
   if (path==='/admin/memory-walls') {
     if (!admin || req.method!=='GET') return missing();

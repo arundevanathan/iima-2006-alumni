@@ -19,11 +19,12 @@ export const candidateSQL = `SELECT u.id,u.digest,u.object_key,u.post,COALESCE(a
 export function selectWalls(rows, roster, limit=84) {
  const keys=Object.keys(themes), walls=Object.fromEntries(keys.map(k=>[k,[]]));
  const counts=new Map(roster.map(id=>[Number(id),0])), used=new Set(), albums=new Map();
- const candidates=rows.map(r=>({...r,theme:classify(r.album),people:[...new Set(typeof r.people==='string'?JSON.parse(r.people):r.people||[])].map(Number).filter(id=>counts.has(id))})).filter(r=>r.theme&&r.digest&&(!(r.width&&r.height)||Math.min(r.width,r.height)>=400)).sort((a,b)=>a.id.localeCompare(b.id));
+ const candidates=rows.map(r=>({...r,theme:classify(r.album),people:[...new Set(typeof r.people==='string'?JSON.parse(r.people):r.people||[])].map(Number).filter(id=>counts.has(id))})).filter(r=>r.theme&&r.digest&&r.people.length>0&&(!(r.width&&r.height)||Math.min(r.width,r.height)>=400)).sort((a,b)=>a.id.localeCompare(b.id));
  const group=r=>Math.max(r.people.length,r.face_count||0);
  const convo=r=>/^convo 2006/i.test(r.album);
  const large=r=>r.theme==='reunion'&&group(r)>10;
- const eligible=r=>!used.has(r.digest)&&(!convo(r)||walls.campus.filter(convo).length<Math.min(8,limit))&&(!large(r)||walls.reunion.filter(large).length<Math.min(8,limit));
+ const chaos=r=>/chaos.*(?:jalsa|euphoria)/i.test(r.album);
+ const eligible=r=>!used.has(r.digest)&&(!chaos(r)||walls.activities.filter(chaos).length<4)&&(!convo(r)||walls.campus.filter(convo).length<Math.min(4,limit))&&(!large(r)||walls.reunion.filter(large).length<Math.min(8,limit));
  const quality=r=>{
  const n=group(r), ratio=r.largest_face/Math.min(r.width,r.height);
  let q=n>=2&&n<=6?24:n<=10?12: -18;
@@ -32,7 +33,7 @@ export function selectWalls(rows, roster, limit=84) {
  if(r.width&&r.height&&r.face_count>0){q+=Math.min(24,ratio*120);if(ratio<0.065)q-=25;if(r.face_y/r.height<0.25)q-=24;}
  return q;
  };
- const similarity=(a,b)=>{if(a.album!==b.album||a.people.length<2||b.people.length<2)return 0;const common=a.people.filter(id=>b.people.includes(id)).length;return common/(a.people.length+b.people.length-common);};
+ const similarity=(a,b)=>{if(a.album!==b.album||!a.people.length||!b.people.length)return 0;const common=a.people.filter(id=>b.people.includes(id)).length;return common/(a.people.length+b.people.length-common);};
  const score=r=>{
  let coverage=0;
  for(const id of r.people){const n=counts.get(id);coverage+=n===0?35:n===1?8:n===2?3:0;}
