@@ -1180,7 +1180,7 @@ async function route(req, env, record, setViewer, ctx) {
       for(const k of keys){
         const slots=input.walls?.[k];
         if(!Array.isArray(slots)||slots.length!==84)return new Response('Invalid slots',{status:400});
-        for(const id of slots){if(id===null)continue;const p=map.get(id);if(!p||p.theme!==k)return new Response('Invalid photo',{status:400});seen.add(p.digest);}
+        for(const id of slots){if(id===null)continue;const p=map.get(id);if(!p||p.theme!==k){if(!saved||!JSON.parse(saved.payload)[k]?.includes(id))return new Response('Invalid photo',{status:400});continue;}seen.add(p.digest);}
       }
       const payload=JSON.stringify(Object.fromEntries(keys.map(k=>[k,input.walls[k]])));
       const result=await run('INSERT INTO memory_wall_layout(id,revision,payload) VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,payload=excluded.payload WHERE revision=?',payload,input.revision);
@@ -1191,14 +1191,23 @@ async function route(req, env, record, setViewer, ctx) {
     const key=keys.includes(u.searchParams.get('wall'))?u.searchParams.get('wall'):'activities';
     const auto=saved?null:selectWalls(rows,roster.map(r=>r.id));
     const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
-    const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>map.has(selected[k]?.[i])?selected[k][i]:null)]));
+    const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>selected[k]?.[i]??null)]));
     const tabs=memoryWallTabs(key);
     const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p>Open Edit Wall to select slots, then choose an action.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
     response.headers.set('Cache-Control','private, no-store');return response;
   }
   if (path==='/admin/memory-walls') {
     if (!admin || req.method!=='GET') return missing();
-    const result=await cachedMemoryWalls(db);
+    await run('CREATE TABLE IF NOT EXISTS memory_wall_layout (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, payload TEXT NOT NULL)');
+    const saved=await one('SELECT payload FROM memory_wall_layout WHERE id=1');
+    let result;
+    if(saved){
+      const rows=await all(candidateSQL), layout=JSON.parse(saved.payload), byId=new Map(rows.map(r=>[r.id,r]));
+      const counts=new Map((await all('SELECT id FROM roster')).map(r=>[r.id,0])), albums={};
+      const walls=Object.fromEntries(['activities','campus','reunion'].map(k=>[k,(layout[k]||[]).map(id=>byId.get(id)).filter(Boolean).map(r=>({...r,people:JSON.parse(r.people)}))]));
+      for(const p of Object.values(walls).flat()){albums[p.album]=(albums[p.album]||0)+1;for(const id of p.people)if(counts.has(id))counts.set(id,counts.get(id)+1);}
+      result={walls,report:{roster:counts.size,covered:[...counts.values()].filter(n=>n>0).length,atLeastTwo:[...counts.values()].filter(n=>n>=2).length,atLeastThree:[...counts.values()].filter(n=>n>=3).length,missing:[...counts].filter(([,n])=>!n).map(([id])=>id),albums}};
+    }else result=await cachedMemoryWalls(db);
     const roster=await all('SELECT id,name FROM roster ORDER BY name');
     const names=new Map(roster.map(r=>[r.id,r.name]));
     const labels={activities:'Campus activities',campus:'Campus life',reunion:'2016 reunion',people:'People wall'};
@@ -1215,7 +1224,7 @@ async function route(req, env, record, setViewer, ctx) {
       tiles=rows.map(r=>'<a href="/media/post/'+encodeURIComponent(r.id)+'" target="_blank" rel="noopener" title="'+escape(r.album+' — '+r.people.map(id=>names.get(id)||id).join(', '))+'"><img loading="lazy" decoding="async" style="display:block;width:100%;aspect-ratio:1;object-fit:cover" src="/media/post/'+encodeURIComponent(r.id)+'?w=96" alt="'+escape(r.album)+'"></a>').join('');
     }
     const missingNames=result.report.missing.map(id=>escape(names.get(id)||String(id))).join(', ');
-    const body='<h1>Memory walls — read-only preview</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>'+summary+'</p><p>Overall thematic coverage: '+result.report.covered+' / '+result.report.roster+' · Twice: '+result.report.atLeastTwo+' · Three times: '+result.report.atLeastThree+'</p><div style="overflow:auto"><div style="min-width:720px;background:#eee6d7;padding:16px;color:#803f2e"><h2 style="text-align:center">'+labels[key]+'</h2><div style="display:grid;grid-template-columns:repeat('+(key==='people'?17:12)+',minmax(0,1fr));gap:4px">'+tiles+'</div><h3 style="text-align:center">IIMA · Class of 06</h3></div></div><details><summary>Unrepresented classmates ('+result.report.missing.length+')</summary><p>'+missingNames+'</p></details><details><summary>Album distribution</summary><ul>'+Object.entries(result.report.albums).filter(([,n])=>n>0).map(([a,n])=>'<li>'+escape(a)+': '+n+'</li>').join('')+'</ul></details>';
+    const body='<h1>Memory walls — read-only preview</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p>'+summary+'</p><p>Overall thematic coverage: '+result.report.covered+' / '+result.report.roster+' · Twice: '+result.report.atLeastTwo+' · Three times: '+result.report.atLeastThree+'</p><div style="overflow:auto"><div style="min-width:720px;background:#eee6d7;padding:16px;color:#803f2e"><h2 style="text-align:center">'+labels[key]+'</h2><div style="display:grid;grid-template-columns:repeat('+(key==='people'?17:12)+',minmax(0,1fr));gap:4px">'+tiles+'</div><h3 style="text-align:center">IIMA · Class of 06</h3></div></div><details><summary>Unrepresented classmates ('+result.report.missing.length+')</summary><p>'+missingNames+'</p></details><details><summary>Album distribution</summary><ul>'+Object.entries(result.report.albums).filter(([,n])=>n>0).map(([a,n])=>'<li>'+escape(a)+': '+n+'</li>').join('')+'</ul></details>';
     const response=await show('Memory walls',body);
     response.headers.set('Cache-Control','private, no-store');
     return response;
