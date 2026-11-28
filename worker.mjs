@@ -1193,7 +1193,7 @@ async function route(req, env, record, setViewer, ctx) {
     const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
     const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>selected[k]?.[i]??null)]));
     const tabs=memoryWallTabs(key);
-    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p></p>'+studioHTML({key,roster,photos,initial,revision:selected._revisions?.[key]??saved?.revision??0}));
+    const response=await show('Memory Wall Studio','<p><a href="/admin">Back to admin</a></p>'+tabs+'<p></p>'+studioHTML({key,roster,photos,initial,revision:selected._revisions?.[key]??saved?.revision??0}));
     response.headers.set('Cache-Control','private, no-store');return response;
   }
   if (path==='/admin/memory-walls') {
