@@ -1,3 +1,7 @@
+function memoryWallTabs(key){const keys=['activities','campus','reunion'];
+    const descriptions={activities:['Campus activities','T-Nite, Chaos, Confluence and other campus events'],campus:['Campus life','Dorms, parties, ramps and everyday memories'],reunion:['2016 reunion','Ten-year reunion moments and old friends'],people:['People wall','Classmates today, with dorm and section']};
+    return '<nav style="display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:8px;margin:16px 0;overflow-x:auto">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;min-width:0;overflow-wrap:anywhere;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
+}
 import {studioHTML,studioJS} from './memory-wall-studio.mjs';
 import {candidateSQL,classify,selectWalls,dryRun as memoryWallDryRun} from './memory-wall-selection.mjs';
 import {isMemorial, loadTribute, memorialPhotos} from './memorial.mjs';
@@ -1188,9 +1192,8 @@ async function route(req, env, record, setViewer, ctx) {
     const auto=saved?null:selectWalls(rows,roster.map(r=>r.id));
     const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
     const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>map.has(selected[k]?.[i])?selected[k][i]:null)]));
-    const descriptions={activities:['Campus activities','T-Nite, Chaos, Confluence and other campus events'],campus:['Campus life','Dorms, parties, ramps and everyday memories'],reunion:['2016 reunion','Ten-year reunion moments and old friends'],people:['People wall','Classmates today, with dorm and section']};
-    const tabs='<nav style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0;overflow-x:auto">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;min-width:0;overflow-wrap:anywhere;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
-    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>Select a photo then another slot to move or swap. Drag and drop also works on desktop.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
+    const tabs=memoryWallTabs(key);
+    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p>Open Edit Wall to select slots, then choose an action.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
     response.headers.set('Cache-Control','private, no-store');return response;
   }
   if (path==='/admin/memory-walls') {
@@ -1200,7 +1203,7 @@ async function route(req, env, record, setViewer, ctx) {
     const names=new Map(roster.map(r=>[r.id,r.name]));
     const labels={activities:'Campus activities',campus:'Campus life',reunion:'2016 reunion',people:'People wall'};
     const key=Object.hasOwn(labels,u.searchParams.get('wall'))?u.searchParams.get('wall'):'activities';
-    const tabs=Object.entries(labels).map(([k,label])=>'<a href="/admin/memory-walls?wall='+k+'" '+(k===key?'aria-current="page"':'')+'>'+label+'</a>').join(' · ');
+    const tabs=memoryWallTabs(key);
     let tiles='',summary='';
     if(key==='people'){
       const portraits=await all("SELECT r.id,r.name,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='dorm' AND trim(value) NOT IN ('','null')),r.dorm) AS dorm,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='section' AND trim(value) NOT IN ('','null')),(SELECT section FROM roster_sections WHERE member=r.id)) AS section,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='nowPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='portraitObject' AND trim(value) NOT IN ('','null')),(SELECT NULLIF(trim(portrait_key),'') FROM profile_seeds WHERE roster_id=r.id AND review_status='approved')) AS then_key,COALESCE((SELECT NULLIF(trim(value),'') FROM profile_fields WHERE member=r.id AND field='thenPhotoObject' AND trim(value) NOT IN ('','null')),(SELECT object_key FROM face_refs WHERE member=r.id AND source IN ('archive','yearbook','then') ORDER BY CASE source WHEN 'archive' THEN 0 WHEN 'yearbook' THEN 1 ELSE 2 END LIMIT 1)) AS fallback FROM roster r ORDER BY r.name");
