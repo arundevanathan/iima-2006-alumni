@@ -1175,16 +1175,16 @@ async function route(req, env, record, setViewer, ctx) {
     if(path==='/admin/memory-wall-layout'){
       if(!post)return missing();
       let input;try{input=await req.json();}catch{return new Response('Invalid JSON',{status:400});}
-      if(!input||input.revision!==(saved?.revision||0))return new Response('Another admin changed the layout. Reload before saving.',{status:409});
-      const seen=new Set();
-      for(const k of keys){
-        const slots=input.walls?.[k];
-        if(!Array.isArray(slots)||slots.length!==84)return new Response('Invalid slots',{status:400});
-        for(const id of slots){if(id===null)continue;const p=map.get(id);if(!p||p.theme!==k){if(!saved||!JSON.parse(saved.payload)[k]?.includes(id))return new Response('Invalid photo',{status:400});continue;}seen.add(p.digest);}
-      }
-      const payload=JSON.stringify(Object.fromEntries(keys.map(k=>[k,input.walls[k]])));
-      const result=await run('INSERT INTO memory_wall_layout(id,revision,payload) VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,payload=excluded.payload WHERE revision=?',payload,input.revision);
-      if(!result.meta.changes)return new Response('Another admin changed the layout. Reload before saving.',{status:409});
+      const k=input?.key;
+      if(!keys.includes(k)||!Array.isArray(input.slots)||input.slots.length!==84||!Number.isInteger(input.revision))return new Response('Invalid slots',{status:400});
+      const old=saved?JSON.parse(saved.payload):null;
+      const revisions=old?._revisions||Object.fromEntries(keys.map(k=>[k,saved?.revision||0]));
+      if(input.revision!==revisions[k])return new Response('Another admin changed this wall. Reload before saving.',{status:409});
+      for(const id of input.slots)if(id!==null&&!map.has(id)&&!old?.[k]?.includes(id))return new Response('Invalid photo',{status:400});
+      const auto=old||Object.fromEntries(keys.map(k=>[k,selectWalls(rows,roster.map(r=>r.id)).walls[k].map(p=>p.id)]));
+      const payload=JSON.stringify({...auto,[k]:input.slots,_revisions:{...revisions,[k]:input.revision+1}});
+      const result=await run('INSERT INTO memory_wall_layout(id,revision,payload) VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,payload=excluded.payload WHERE revision=?',payload,saved?.revision||0);
+      if(!result.meta.changes)return new Response('Another save occurred simultaneously. Retry saving.',{status:409});
       return json({revision:input.revision+1});
     }
     if(post)return missing();
@@ -1193,7 +1193,7 @@ async function route(req, env, record, setViewer, ctx) {
     const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
     const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>selected[k]?.[i]??null)]));
     const tabs=memoryWallTabs(key);
-    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p>Open Edit Wall to select slots, then choose an action.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
+    const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p>'+tabs+'<p>Open Edit Wall to select slots, then choose an action.</p>'+studioHTML({key,roster,photos,initial,revision:selected._revisions?.[key]??saved?.revision??0}));
     response.headers.set('Cache-Control','private, no-store');return response;
   }
   if (path==='/admin/memory-walls') {
