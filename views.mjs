@@ -685,7 +685,7 @@ export const page={
     const yes=value=>value?'Yes':'Missing';
     const table=(head,rows)=>`<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${head.map(label=>`<th scope="col">${e(label)}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(([person,...cells])=>`<tr><th scope="row">${link('/people/'+person.id,person.name)}</th>${cells.map(value=>`<td>${e(value)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-    return `<p>${link('/admin?view=tools','Admin tools')} · ${link('/admin/analytics','Site analytics')} · ${link('/admin/export?kind=reunion','Download attendee logistics')}</p>
+    return `<p>${link('/admin?view=tools','Admin tools')} · ${link('/admin/analytics','Site analytics')} · ${link('/admin/memory-walls','Memory Wall Studio')} · ${link('/admin/export?kind=reunion','Download attendee logistics')}</p>
       <div class="admin-stats">${stats.map(([label,number,total])=>`<div><strong>${number} / ${total}</strong><span>${e(label)}</span></div>`).join('')}</div>
       <h2>Confirmed attendees</h2><p>See which critical details are missing, including sizes for everyone in the party.</p>
       ${table(['Classmate','Details saved','Missing critical details'],attendees.map(row=>[row,row.saved?'Yes':'Tracker only',row.missing.join(', ')||'Complete']))}
