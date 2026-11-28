@@ -1176,7 +1176,7 @@ async function route(req, env, record, setViewer, ctx) {
       for(const k of keys){
         const slots=input.walls?.[k];
         if(!Array.isArray(slots)||slots.length!==84)return new Response('Invalid slots',{status:400});
-        for(const id of slots){if(id===null)continue;const p=map.get(id);if(!p||p.theme!==k||seen.has(p.digest))return new Response('Invalid or duplicate photo',{status:400});seen.add(p.digest);}
+        for(const id of slots){if(id===null)continue;const p=map.get(id);if(!p||p.theme!==k)return new Response('Invalid photo',{status:400});seen.add(p.digest);}
       }
       const payload=JSON.stringify(Object.fromEntries(keys.map(k=>[k,input.walls[k]])));
       const result=await run('INSERT INTO memory_wall_layout(id,revision,payload) VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,payload=excluded.payload WHERE revision=?',payload,input.revision);
@@ -1189,7 +1189,7 @@ async function route(req, env, record, setViewer, ctx) {
     const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
     const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>map.has(selected[k]?.[i])?selected[k][i]:null)]));
     const descriptions={activities:['Campus activities','T-Nite, Chaos, Confluence and other campus events'],campus:['Campus life','Dorms, parties, ramps and everyday memories'],reunion:['2016 reunion','Ten-year reunion moments and old friends'],people:['People wall','Classmates today, with dorm and section']};
-    const tabs='<nav style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:16px 0">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
+    const tabs='<nav style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0;overflow-x:auto">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;min-width:0;overflow-wrap:anywhere;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
     const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>Select a photo then another slot to move or swap. Drag and drop also works on desktop.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
     response.headers.set('Cache-Control','private, no-store');return response;
   }
