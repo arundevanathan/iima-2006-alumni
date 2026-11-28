@@ -1166,7 +1166,7 @@ async function route(req, env, record, setViewer, ctx) {
     const saved=await one('SELECT revision,payload FROM memory_wall_layout WHERE id=1');
     const rows=await all(candidateSQL);
     const roster=await all("SELECT r.id,r.name,r.dorm,rs.section FROM roster r LEFT JOIN roster_sections rs ON rs.member=r.id ORDER BY r.name");
-    const photos=rows.map(r=>({id:r.id,digest:r.digest,album:r.album,theme:classify(r.album),people:JSON.parse(r.people)})).filter(r=>r.theme&&r.digest);
+    const photos=rows.map(r=>({id:r.id,digest:r.digest,album:r.album,theme:classify(r.album),people:JSON.parse(r.people)})).filter(r=>r.theme&&r.digest&&r.people.length);
     const keys=['activities','campus','reunion'], map=new Map(photos.map(p=>[p.id,p]));
     if(path==='/admin/memory-wall-layout'){
       if(!post)return missing();
@@ -1188,7 +1188,8 @@ async function route(req, env, record, setViewer, ctx) {
     const auto=saved?null:selectWalls(rows,roster.map(r=>r.id));
     const selected=saved?JSON.parse(saved.payload):Object.fromEntries(keys.map(k=>[k,auto.walls[k].map(p=>p.id)]));
     const initial=Object.fromEntries(keys.map(k=>[k,Array.from({length:84},(_,i)=>map.has(selected[k]?.[i])?selected[k][i]:null)]));
-    const tabs=keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'">'+({activities:'Campus activities',campus:'Campus life',reunion:'2016 reunion',people:'People wall'})[k]+'</a>').join(' · ');
+    const descriptions={activities:['Campus activities','T-Nite, Chaos, Confluence and other campus events'],campus:['Campus life','Dorms, parties, ramps and everyday memories'],reunion:['2016 reunion','Ten-year reunion moments and old friends'],people:['People wall','Classmates today, with dorm and section']};
+    const tabs='<nav style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:16px 0">'+keys.concat('people').map(k=>'<a href="/admin/memory-walls?wall='+k+'" style="display:block;padding:12px;border:1px solid #b9a99a;border-radius:12px;text-decoration:none;background:'+(k===key?'#873f2d;color:white':'transparent;color:inherit')+'"><strong>'+descriptions[k][0]+'</strong><small style="display:block;margin-top:5px">'+descriptions[k][1]+'</small></a>').join('')+'</nav>';
     const response=await show('Memory Wall Studio','<h1>Memory Wall Studio</h1><p><a href="/admin">Back to admin</a></p><nav>'+tabs+'</nav><p>Select a photo then another slot to move or swap. Drag and drop also works on desktop.</p>'+studioHTML({key,roster,photos,initial,revision:saved?.revision||0}));
     response.headers.set('Cache-Control','private, no-store');return response;
   }
